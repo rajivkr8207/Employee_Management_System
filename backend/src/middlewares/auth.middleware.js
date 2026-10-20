@@ -34,3 +34,10 @@ export const verifyAdmin = (req, res, next) => {
   }
   return next();
 };
+
+export const verifyStoreAdmin = (req, res, next) => {
+  if (req.user?.role !== 'storeadmin') {
+    return next(new ApiError(403, 'Store administrator access is required'));
+  }
+  return next();
+};
