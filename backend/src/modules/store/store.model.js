@@ -4,7 +4,7 @@ const storeSchema = new mongoose.Schema(
   {
     organizationId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Organization",
+      ref: 'Organization',
       required: true,
       index: true,
     },
@@ -32,7 +32,6 @@ const storeSchema = new mongoose.Schema(
       lng: { type: Number, required: true },
       radius: { type: Number, default: 100 }, // metres
     },
-
     managerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

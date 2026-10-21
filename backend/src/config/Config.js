@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const Config = {
   port: process.env.PORT,
@@ -14,7 +14,7 @@ const Config = {
 
   // Redis (optional)
   redis_host: process.env.REDIS_HOST,
-  redis_port: process.env.REDIS_PORT,
+  redis_port: process.env.REDIS_PORT ? Number(process.env.redis_port) : undefined,
   redis_password: process.env.REDIS_PASSWORD,
 
   // SMTP (optional)

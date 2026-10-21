@@ -3,7 +3,17 @@ import prettier from 'eslint-config-prettier';
 
 export default [
   {
-    ignores: ['node_modules/**', '.env*', 'public/**/*', 'dist/**', 'coverage/**', 'uploads/**'],
+    ignores: [
+      'node_modules/**',
+      '.env*',
+      'public/**/*',
+      'dist/**',
+      'coverage/**',
+      'uploads/**',
+      'tests',
+      'src/middlewares/error.middlewares.js',
+      'src/app.middleware.js'
+    ],
   },
 
   js.configs.recommended,

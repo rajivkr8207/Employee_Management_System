@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 const organizationSchema = new mongoose.Schema(
   {
     name: {
@@ -9,7 +9,7 @@ const organizationSchema = new mongoose.Schema(
 
     ownerId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
 
@@ -27,7 +27,7 @@ const organizationSchema = new mongoose.Schema(
 
     businessType: {
       type: String,
-      default: "restaurant",
+      default: 'restaurant',
     },
 
     address: {
@@ -35,40 +35,37 @@ const organizationSchema = new mongoose.Schema(
       city: String,
       state: String,
       pincode: String,
-      country: { type: String, default: "India" },
+      country: { type: String, default: 'India' },
     },
 
     verificationStatus: {
       type: String,
-      enum: ["pending", "approved", "rejected"],
-      default: "pending",
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'pending',
     },
 
     verifiedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       default: null,
     },
 
     subscriptionPlan: {
       type: String,
-      enum: ["free", "basic", "premium"],
-      default: "free",
+      enum: ['free', 'basic', 'premium'],
+      default: 'free',
     },
 
     status: {
       type: String,
-      enum: ["active", "inactive", "suspended"],
-      default: "active",
+      enum: ['active', 'inactive', 'suspended'],
+      default: 'active',
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 organizationSchema.index({ email: 1 }, { unique: true });
 organizationSchema.index({ ownerId: 1 }, { unique: true });
 
-export const organizationModel = mongoose.model(
-  "Organization",
-  organizationSchema
-);
+export const organizationModel = mongoose.model('Organization', organizationSchema);

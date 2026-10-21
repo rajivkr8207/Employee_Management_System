@@ -1,0 +1,1 @@
+npm test -- --runInBand tests/health.test.js tests/auth.test.js

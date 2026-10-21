@@ -7,7 +7,6 @@ export class MailService {
     if (!Config.smtp_host || !Config.smtp_user || !Config.smtp_pass) {
       throw new ApiError(503, 'Email service is not configured');
     }
-
   }
 
   async sendMail(to, subject, text) {

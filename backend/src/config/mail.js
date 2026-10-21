@@ -3,7 +3,7 @@ import Config from './Config.js';
 const MailTranspoter = nodemailer.createTransport({
   host: Config.smtp_host,
   port: Number(Config.smtp_port) || 587,
-  secure: Config.smtp_secure === 'true',
+  secure: false,
   auth: {
     user: Config.smtp_user,
     pass: Config.smtp_pass,
