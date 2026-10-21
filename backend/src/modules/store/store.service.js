@@ -1,5 +1,6 @@
 import { ApiError } from '../../utils/ApiError.js';
 import User from '../user/user.model.js';
+import { getApprovedOrganizationForOwner } from '../organization/organization.service.js';
 import { StoreModel } from './store.model.js';
 
 const populateManager = (query) => query.populate('managerId', 'fullName username role');
@@ -50,9 +51,11 @@ export const getStore = async (storeId, storeAdminId) => {
 };
 
 export const createStore = async (storeData, storeAdminId) => {
+  const organization = await getApprovedOrganizationForOwner(storeAdminId);
   await ensureUniqueCode(storeData.code);
   const store = await StoreModel.create({
     ...pickStoreFields(storeData, ['name', 'code', 'address', 'location', 'status']),
+    organizationId: organization._id,
     managerId: storeAdminId,
     createdBy: storeAdminId,
   });
