@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import Config from '../../config/Config.js';
+import { ROLE_VALUES, ROLES } from '../../constants/roles.js';
 
 const userSchema = new mongoose.Schema(
   {
@@ -58,8 +59,8 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['admin', 'employ', 'storeadmin', 'manager'],
-      default: 'manager',
+      enum: ROLE_VALUES,
+      default: ROLES.MANAGER,
       index: true,
     },
 

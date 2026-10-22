@@ -12,7 +12,8 @@ export default [
       'uploads/**',
       'tests',
       'src/middlewares/error.middlewares.js',
-      'src/app.middleware.js'
+      'src/app.middleware.js',
+      'src/docs/*'
     ],
   },
 

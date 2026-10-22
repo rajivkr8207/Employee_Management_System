@@ -6,6 +6,7 @@ import { MailService } from '../../services/mail.service.js';
 import StoreAdminInvitation from './store-admin-invitation.model.js';
 import crypto from 'crypto';
 import { URL } from 'node:url';
+import { ROLES } from '../../constants/roles.js';
 
 export const registerUser = async ({
   fullName,
@@ -34,7 +35,7 @@ export const registerUser = async ({
     password,
     ...(mobile ? { mobile } : {}),
     avatar: image,
-    role: 'employ',
+    role: ROLES.EMPLOYEE,
     provider,
     googleId,
     otp,
@@ -132,7 +133,7 @@ export const registerStoreAdmin = async ({ token, fullName, username, password, 
     email: invitation.email,
     password,
     ...(mobile ? { mobile } : {}),
-    role: 'storeadmin',
+    role: ROLES.STORE_ADMIN,
     provider: 'local',
     isVerified: true,
     isApproved: false,
@@ -155,13 +156,13 @@ export const registerStoreAdmin = async ({ token, fullName, username, password, 
 };
 
 export const listPendingStoreAdmins = async () =>
-  User.find({ role: 'storeadmin', isApproved: false }).select(
+  User.find({ role: ROLES.STORE_ADMIN, isApproved: false }).select(
     'fullName username email mobile createdAt',
   );
 
 export const approveStoreAdmin = async (id) => {
   const user = await User.findOneAndUpdate(
-    { _id: id, role: 'storeadmin', isApproved: false },
+    { _id: id, role: ROLES.STORE_ADMIN, isApproved: false },
     { $set: { isApproved: true } },
     { new: true, runValidators: true },
   );

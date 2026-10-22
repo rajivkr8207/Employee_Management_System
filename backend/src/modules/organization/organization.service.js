@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { ROLES } from '../../constants/roles.js';
 import { ApiError } from '../../utils/ApiError.js';
 import User from '../user/user.model.js';
 import { organizationModel } from './organization.model.js';
@@ -16,7 +17,7 @@ const pickOrganizationFields = (organizationData) =>
 const ensureOrganizationOwner = async (ownerId) => {
   const user = await User.findById(ownerId).select('_id role');
   if (!user) throw new ApiError(404, 'User account was not found');
-  if (!['employ', 'storeadmin'].includes(user.role)) {
+  if (![ROLES.EMPLOYEE, ROLES.STORE_ADMIN].includes(user.role)) {
     throw new ApiError(403, 'Only registered organization owners can create an organization');
   }
   return user;
@@ -58,8 +59,8 @@ export const createOrganization = async (organizationData, ownerId) => {
     throw error;
   }
 
-  if (owner.role !== 'storeadmin') {
-    owner.role = 'storeadmin';
+  if (owner.role !== ROLES.STORE_ADMIN) {
+    owner.role = ROLES.STORE_ADMIN;
     await owner.save();
   }
   return organization;

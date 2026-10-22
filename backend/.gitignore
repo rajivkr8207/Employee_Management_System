@@ -2,3 +2,4 @@ node_modules
 .env 
 logs
 genrate.js
+docs/*html

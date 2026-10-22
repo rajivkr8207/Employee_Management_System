@@ -1,0 +1,1328 @@
+openapi: 3.0.3
+info:
+  title: Employee Management System API
+  version: 1.0.0
+  description: |
+    OpenAPI documentation for the backend Express API.
+
+    All endpoints use the `/api/v1` prefix. Protected routes authenticate with
+    the `accessToken` HTTP-only cookie set by login. Refresh tokens can be
+    supplied in the `refreshToken` cookie or in the refresh endpoint request body.
+servers:
+  - url: /api/v1
+    description: Current backend server
+tags:
+  - name: Health
+  - name: Authentication
+  - name: Organizations
+  - name: Stores
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Check server health
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [uptime, message, timestamp]
+                        properties:
+                          uptime:
+                            type: number
+                            description: Server uptime in seconds
+                          message:
+                            type: string
+                            example: OK
+                          timestamp:
+                            type: integer
+                            format: int64
+                            description: Unix timestamp in milliseconds
+
+  /auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register an employee account
+      operationId: registerUser
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Account created; a verification OTP is sent by email
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          user:
+                            $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '502':
+          $ref: '#/components/responses/ServiceError'
+        '503':
+          $ref: '#/components/responses/ServiceError'
+
+  /auth/verify-otp:
+    post:
+      tags: [Authentication]
+      summary: Verify an account using its email OTP
+      operationId: verifyOtp
+      security: []
+      description: Provide the email in the JSON body or as a query parameter, and provide the OTP in the JSON body.
+      parameters:
+        - name: email
+          in: query
+          required: false
+          schema:
+            type: string
+            format: email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [otp]
+              properties:
+                email:
+                  type: string
+                  format: email
+                otp:
+                  type: string
+                  pattern: '^\d{6}$'
+                  example: '123456'
+      responses:
+        '200':
+          description: Account verified
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          user:
+                            $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/resend-otp:
+    post:
+      tags: [Authentication]
+      summary: Resend an account verification OTP
+      operationId: resendOtp
+      security: []
+      description: Provide the email in the JSON body or as a query parameter.
+      parameters:
+        - name: email
+          in: query
+          required: false
+          schema:
+            type: string
+            format: email
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Verification OTP resent
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          user:
+                            $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '502':
+          $ref: '#/components/responses/ServiceError'
+        '503':
+          $ref: '#/components/responses/ServiceError'
+
+  /auth/store-admin/invitations/verify:
+    get:
+      tags: [Authentication]
+      summary: Verify a store administrator invitation token
+      operationId: verifyStoreAdminInvitation
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-f0-9]{64}$'
+      responses:
+        '200':
+          description: Invitation is valid
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [email, expiresAt]
+                        properties:
+                          email:
+                            type: string
+                            format: email
+                          expiresAt:
+                            type: string
+                            format: date-time
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/store-admin/register:
+    post:
+      tags: [Authentication]
+      summary: Register using a store administrator invitation
+      operationId: registerInvitedStoreAdmin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvitedStoreAdminRequest'
+      responses:
+        '201':
+          description: Registration submitted for administrator approval
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          user:
+                            $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Log in
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [identifier, password]
+              properties:
+                identifier:
+                  type: string
+                  description: Account email, username, or mobile number
+                  example: employee@example.com
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Login successful; access and refresh cookies are set
+          headers:
+            Set-Cookie:
+              description: Sets HTTP-only accessToken and refreshToken cookies
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [user, accessToken, refreshToken]
+                        properties:
+                          user:
+                            $ref: '#/components/schemas/User'
+                          accessToken:
+                            type: string
+                          refreshToken:
+                            type: string
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /auth/refresh-token:
+    post:
+      tags: [Authentication]
+      summary: Refresh access and refresh tokens
+      operationId: refreshAuthToken
+      security: []
+      description: Reads the refreshToken cookie first, or accepts a refreshToken in the JSON body.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: Tokens refreshed and cookies updated
+          headers:
+            Set-Cookie:
+              description: Sets updated HTTP-only accessToken and refreshToken cookies
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [accessToken, refreshToken]
+                        properties:
+                          accessToken:
+                            type: string
+                          refreshToken:
+                            type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Log out the current user
+      operationId: logout
+      security:
+        - accessCookie: []
+      responses:
+        '200':
+          description: User logged out and authentication cookies cleared
+          headers:
+            Set-Cookie:
+              description: Clears accessToken and refreshToken cookies
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /auth/profile:
+    get:
+      tags: [Authentication]
+      summary: Get the current user's profile
+      operationId: getProfile
+      security:
+        - accessCookie: []
+      responses:
+        '200':
+          description: Profile fetched
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags: [Authentication]
+      summary: Update the current user's profile
+      operationId: updateProfile
+      security:
+        - accessCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                fullName:
+                  type: string
+                  minLength: 2
+                  maxLength: 60
+                username:
+                  type: string
+                  minLength: 3
+                  maxLength: 30
+                  pattern: '^[a-zA-Z0-9]+$'
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /auth/change-password:
+    patch:
+      tags: [Authentication]
+      summary: Change the current user's password
+      operationId: changePassword
+      security:
+        - accessCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [oldPassword, newPassword]
+              properties:
+                oldPassword:
+                  type: string
+                  format: password
+                newPassword:
+                  type: string
+                  format: password
+                  minLength: 6
+                  pattern: '\d'
+      responses:
+        '200':
+          description: Password changed; existing refresh token is revoked
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /auth/store-admin/invitations:
+    post:
+      tags: [Authentication]
+      summary: Invite a store administrator
+      operationId: inviteStoreAdmin
+      security:
+        - accessCookie: []
+      description: Administrator-only. The invitation is single-use and expires after 24 hours.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '201':
+          description: Invitation email sent
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [email, expiresAt]
+                        properties:
+                          email:
+                            type: string
+                            format: email
+                          expiresAt:
+                            type: string
+                            format: date-time
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/ServiceError'
+
+  /auth/store-admin/pending:
+    get:
+      tags: [Authentication]
+      summary: List store administrator accounts awaiting approval
+      operationId: getPendingStoreAdmins
+      security:
+        - accessCookie: []
+      description: Administrator-only.
+      responses:
+        '200':
+          description: Pending accounts fetched
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          users:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/PendingStoreAdmin'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /auth/store-admin/{userId}/approve:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    patch:
+      tags: [Authentication]
+      summary: Approve a pending store administrator
+      operationId: approveStoreAdmin
+      security:
+        - accessCookie: []
+      description: Administrator-only.
+      responses:
+        '200':
+          description: Store administrator approved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          user:
+                            $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /organizations:
+    post:
+      tags: [Organizations]
+      summary: Submit an organization for approval
+      operationId: createOrganization
+      security:
+        - accessCookie: []
+      description: Authenticated employee or store administrator; a user can own one organization.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrganizationRequest'
+      responses:
+        '201':
+          description: Organization submitted with pending verification status
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          organization:
+                            $ref: '#/components/schemas/Organization'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /organizations/mine:
+    get:
+      tags: [Organizations]
+      summary: Get the current owner's organization
+      operationId: getMyOrganization
+      security:
+        - accessCookie: []
+      responses:
+        '200':
+          description: Organization fetched
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          organization:
+                            $ref: '#/components/schemas/Organization'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /organizations/pending:
+    get:
+      tags: [Organizations]
+      summary: List organizations awaiting approval
+      operationId: getPendingOrganizations
+      security:
+        - accessCookie: []
+      description: Administrator-only. Results include a populated owner summary.
+      responses:
+        '200':
+          description: Pending organizations fetched
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          organizations:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Organization'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /organizations/{organizationId}/approval:
+    parameters:
+      - name: organizationId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/ObjectId'
+    patch:
+      tags: [Organizations]
+      summary: Approve or reject a pending organization
+      operationId: reviewOrganization
+      security:
+        - accessCookie: []
+      description: Administrator-only. Rejected organizations are marked inactive.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [verificationStatus]
+              properties:
+                verificationStatus:
+                  type: string
+                  enum: [approved, rejected]
+      responses:
+        '200':
+          description: Organization review completed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          organization:
+                            $ref: '#/components/schemas/Organization'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /stores:
+    get:
+      tags: [Stores]
+      summary: List stores owned by the current store administrator
+      operationId: listStores
+      security:
+        - accessCookie: []
+      responses:
+        '200':
+          description: Stores fetched
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          stores:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Store'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Stores]
+      summary: Create a store
+      operationId: createStore
+      security:
+        - accessCookie: []
+      description: Requires a store administrator with an approved active organization.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateStoreRequest'
+      responses:
+        '201':
+          description: Store created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          store:
+                            $ref: '#/components/schemas/Store'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /stores/{storeId}:
+    parameters:
+      - name: storeId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/ObjectId'
+    get:
+      tags: [Stores]
+      summary: Get an owned store
+      operationId: getStore
+      security:
+        - accessCookie: []
+      responses:
+        '200':
+          description: Store fetched
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          store:
+                            $ref: '#/components/schemas/Store'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Stores]
+      summary: Update an owned store
+      operationId: updateStore
+      security:
+        - accessCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateStoreRequest'
+      responses:
+        '200':
+          description: Store updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          store:
+                            $ref: '#/components/schemas/Store'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      tags: [Stores]
+      summary: Delete an owned store
+      operationId: deleteStore
+      security:
+        - accessCookie: []
+      responses:
+        '200':
+          description: Store deleted
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    accessCookie:
+      type: apiKey
+      in: cookie
+      name: accessToken
+      description: HTTP-only access token cookie returned by login.
+  parameters:
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/ObjectId'
+  responses:
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Authentication required, invalid credentials, or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Authenticated user lacks permission or account eligibility
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Requested resource was not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: Resource conflicts with existing data or state
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ServiceError:
+      description: A required external service is unavailable or failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    ObjectId:
+      type: string
+      pattern: '^[a-fA-F0-9]{24}$'
+      example: 507f1f77bcf86cd799439011
+    NullableObjectId:
+      type: string
+      nullable: true
+      pattern: '^[a-fA-F0-9]{24}$'
+    ApiResponse:
+      type: object
+      required: [statusCode, data, message, success]
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        data:
+          description: Response payload
+        message:
+          type: string
+          example: Success
+        success:
+          type: boolean
+          example: true
+    ErrorResponse:
+      type: object
+      required: [success, message]
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: Request validation failed
+        errors:
+          type: array
+          items: {}
+        stack:
+          type: string
+          description: Included only in development environments
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      required: [fullName, username, email, password]
+      properties:
+        fullName:
+          type: string
+          minLength: 2
+          maxLength: 60
+        username:
+          type: string
+          minLength: 3
+          maxLength: 30
+          pattern: '^[a-zA-Z0-9]+$'
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          minLength: 6
+          pattern: '\d'
+        mobile:
+          type: string
+          pattern: '^[6-9]\d{9}$'
+    InvitedStoreAdminRequest:
+      type: object
+      additionalProperties: false
+      required: [token, fullName, username, password]
+      properties:
+        token:
+          type: string
+          pattern: '^[a-fA-F0-9]{64}$'
+        fullName:
+          type: string
+          minLength: 2
+          maxLength: 60
+        username:
+          type: string
+          minLength: 3
+          maxLength: 30
+          pattern: '^[a-zA-Z0-9]+$'
+        password:
+          type: string
+          format: password
+          minLength: 6
+          pattern: '\d'
+        mobile:
+          type: string
+          pattern: '^[6-9]\d{9}$'
+    User:
+      type: object
+      properties:
+        _id:
+          $ref: '#/components/schemas/ObjectId'
+        id:
+          $ref: '#/components/schemas/ObjectId'
+        fullName:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        mobile:
+          type: string
+          nullable: true
+        avatar:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum: [admin, employ, storeadmin, manager]
+        provider:
+          type: string
+          enum: [local, google]
+        isVerified:
+          type: boolean
+        isActive:
+          type: boolean
+        isApproved:
+          type: boolean
+        isBlocked:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      description: Passwords, OTP values, and refresh-token hashes are never returned.
+    UserSummary:
+      type: object
+      properties:
+        _id:
+          $ref: '#/components/schemas/ObjectId'
+        fullName:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+    PendingStoreAdmin:
+      type: object
+      properties:
+        _id:
+          $ref: '#/components/schemas/ObjectId'
+        fullName:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        mobile:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    Address:
+      type: object
+      properties:
+        street:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        pincode:
+          type: string
+        country:
+          type: string
+          default: India
+    StoreAddressInput:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        street:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        pincode:
+          type: string
+        country:
+          type: string
+    Organization:
+      type: object
+      properties:
+        _id:
+          $ref: '#/components/schemas/ObjectId'
+        name:
+          type: string
+        ownerId:
+          oneOf:
+            - $ref: '#/components/schemas/ObjectId'
+            - $ref: '#/components/schemas/UserSummary'
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        businessType:
+          type: string
+          default: restaurant
+        address:
+          $ref: '#/components/schemas/Address'
+        verificationStatus:
+          type: string
+          enum: [pending, approved, rejected]
+        verifiedBy:
+          $ref: '#/components/schemas/NullableObjectId'
+        subscriptionPlan:
+          type: string
+          enum: [free, basic, premium]
+        status:
+          type: string
+          enum: [active, inactive, suspended]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateOrganizationRequest:
+      type: object
+      additionalProperties: false
+      required: [name, email]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 120
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          maxLength: 30
+        businessType:
+          type: string
+          maxLength: 80
+        address:
+          $ref: '#/components/schemas/Address'
+    Location:
+      type: object
+      required: [lat, lng]
+      properties:
+        lat:
+          type: number
+          minimum: -90
+          maximum: 90
+        lng:
+          type: number
+          minimum: -180
+          maximum: 180
+        radius:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+          default: 100
+          description: Geofence radius in metres
+    UpdateLocation:
+      type: object
+      minProperties: 1
+      properties:
+        lat:
+          type: number
+          minimum: -90
+          maximum: 90
+        lng:
+          type: number
+          minimum: -180
+          maximum: 180
+        radius:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+          description: Geofence radius in metres
+    Store:
+      type: object
+      properties:
+        _id:
+          $ref: '#/components/schemas/ObjectId'
+        organizationId:
+          $ref: '#/components/schemas/ObjectId'
+        name:
+          type: string
+        code:
+          type: string
+        address:
+          $ref: '#/components/schemas/Address'
+        location:
+          $ref: '#/components/schemas/Location'
+        managerId:
+          description: Manager identifier or populated manager summary
+          oneOf:
+            - $ref: '#/components/schemas/NullableObjectId'
+            - type: object
+              properties:
+                _id:
+                  $ref: '#/components/schemas/ObjectId'
+                fullName:
+                  type: string
+                username:
+                  type: string
+                role:
+                  type: string
+                  enum: [manager, storeadmin]
+        status:
+          type: string
+          enum: [active, inactive]
+        createdBy:
+          $ref: '#/components/schemas/ObjectId'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateStoreRequest:
+      type: object
+      additionalProperties: false
+      required: [name, code, location]
+      properties:
+        name:
+          type: string
+          maxLength: 120
+        code:
+          type: string
+          maxLength: 50
+        address:
+          $ref: '#/components/schemas/StoreAddressInput'
+        location:
+          $ref: '#/components/schemas/Location'
+        status:
+          type: string
+          enum: [active, inactive]
+    UpdateStoreRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        code:
+          type: string
+          minLength: 1
+          maxLength: 50
+        address:
+          $ref: '#/components/schemas/StoreAddressInput'
+        location:
+          $ref: '#/components/schemas/UpdateLocation'
+        managerId:
+          $ref: '#/components/schemas/NullableObjectId'
+        status:
+          type: string
+          enum: [active, inactive]

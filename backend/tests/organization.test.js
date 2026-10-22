@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { jest } from '@jest/globals';
+import { ROLES } from '../src/constants/roles.js';
 
 jest.unstable_mockModule('../src/config/redis.js', () => ({
   default: {
@@ -17,7 +18,7 @@ const { default: UserModel } = await import('../src/modules/user/user.model.js')
 const { organizationModel } = await import('../src/modules/organization/organization.model.js');
 const { connectTestDB, closeTestDB, clearTestDB } = await import('./setup.js');
 
-const createUser = async ({ username, role = 'employ' }) => {
+const createUser = async ({ username, role = ROLES.EMPLOYEE }) => {
   const user = await UserModel.create({
     fullName: 'Test User',
     username,
@@ -79,7 +80,7 @@ describe('Organization API', () => {
       expect(res.body.data.organization.ownerId).toBe(user.id);
 
       const updatedUser = await UserModel.findById(user.id);
-      expect(updatedUser.role).toBe('storeadmin');
+      expect(updatedUser.role).toBe(ROLES.STORE_ADMIN);
       expect(await organizationModel.countDocuments({ ownerId: user.id })).toBe(1);
     });
 
@@ -134,7 +135,10 @@ describe('Organization API', () => {
   describe('Organization approval', () => {
     it('allows an administrator to list and approve pending organizations', async () => {
       const { user: owner } = await createUser({ username: 'pendingowner' });
-      const { user: admin, token } = await createUser({ username: 'orgadmin', role: 'admin' });
+      const { user: admin, token } = await createUser({
+        username: 'orgadmin',
+        role: ROLES.ADMIN,
+      });
       const organization = await organizationModel.create({
         ...organizationDetails,
         ownerId: owner.id,

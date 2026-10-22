@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { jest } from '@jest/globals';
+import { ROLES } from '../src/constants/roles.js';
 
 jest.unstable_mockModule('../src/config/redis.js', () => ({
   default: {
@@ -18,7 +19,7 @@ const { organizationModel } = await import('../src/modules/organization/organiza
 const { StoreModel } = await import('../src/modules/store/store.model.js');
 const { connectTestDB, closeTestDB, clearTestDB } = await import('./setup.js');
 
-const createUser = async ({ username, role = 'storeadmin' }) => {
+const createUser = async ({ username, role = ROLES.STORE_ADMIN }) => {
   const user = await UserModel.create({
     fullName: 'Test Store Admin',
     username,
@@ -69,7 +70,7 @@ describe('Store API', () => {
       const res = await request(app).post('/api/v1/stores').send(storeDetails);
       expect(res.statusCode).toBe(401);
 
-      const { token } = await createUser({ username: 'employee', role: 'employ' });
+      const { token } = await createUser({ username: 'employee', role: ROLES.EMPLOYEE });
       const forbidden = await request(app)
         .post('/api/v1/stores')
         .set('Cookie', `accessToken=${token}`)

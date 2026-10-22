@@ -1,4 +1,5 @@
 import { ApiError } from '../../utils/ApiError.js';
+import { ROLES } from '../../constants/roles.js';
 import User from '../user/user.model.js';
 import { getApprovedOrganizationForOwner } from '../organization/organization.service.js';
 import { StoreModel } from './store.model.js';
@@ -22,7 +23,7 @@ const ensureManagerExists = async (managerId) => {
   if (!managerId) return;
   const manager = await User.findOne({
     _id: managerId,
-    role: 'manager',
+    role: ROLES.MANAGER,
     isActive: true,
     isBlocked: false,
     isApproved: true,
