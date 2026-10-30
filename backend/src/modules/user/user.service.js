@@ -14,7 +14,6 @@ export const registerUser = async ({
   email,
   password,
   mobile,
-  image,
   provider = 'local',
   googleId = null,
 }) => {
@@ -26,6 +25,7 @@ export const registerUser = async ({
   if (existingUser) {
     throw new ApiError(409, 'User with this email, username, or mobile already exists');
   }
+
   const otp = crypto.randomInt(100000, 1000000).toString();
   const otpExpire = new Date(Date.now() + 10 * 60 * 1000);
   const user = await User.create({
@@ -34,7 +34,7 @@ export const registerUser = async ({
     email,
     password,
     ...(mobile ? { mobile } : {}),
-    avatar: image,
+    // avatar: image,
     role: ROLES.EMPLOYEE,
     provider,
     googleId,
@@ -42,15 +42,15 @@ export const registerUser = async ({
     otpExpire,
     isVerified: provider !== 'local',
   });
-  if (provider === 'local') {
-    try {
-      const mail = await new MailService().SendRegisterMail(email, otp, fullName);
-      if (!mail) throw new ApiError(502, 'Failed to send verification email');
-    } catch (error) {
-      await User.findByIdAndDelete(user._id);
-      throw error;
-    }
-  }
+  // if (provider === 'local') {
+  //   try {
+  //     const mail = await new MailService().SendRegisterMail(email, otp, fullName);
+  //     if (!mail) throw new ApiError(502, 'Failed to send verification email');
+  //   } catch (error) {
+  //     await User.findByIdAndDelete(user._id);
+  //     throw error;
+  //   }
+  // }
 
   return user;
 };

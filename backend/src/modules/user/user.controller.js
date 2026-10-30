@@ -35,14 +35,13 @@ const cookieClearOptions = {
 // ─────────────────────────────────────────────
 export const register = asyncHandler(async (req, res) => {
   const { fullName, username, email, password, mobile } = req.body;
-  const image = req.file ? req.file.path : null;
+  // const image = req.file ? req.file.path : null;
   const user = await registerUser({
     fullName,
     username,
     email,
     password,
     mobile,
-    image,
   });
   return res.status(201).json(new ApiResponse(201, { user }, 'User registered successfully'));
 });
