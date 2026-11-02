@@ -9,15 +9,10 @@ import {
     logoutThunk,
 } from "../auth.thunk";
 import { clearAuth, clearErrors } from "../auth.slice";
+import { getRoleDashboardPath } from "../../../constants/roles";
 
 /**
  * useAuth — central hook for all auth operations.
- *
- * Returns:
- *  - user, token, isAuthenticated
- *  - status flags: loginLoading, registerLoading, profileLoading, updateLoading
- *  - errors: loginError, registerError, profileError, updateProfileError
- *  - actions: login(), register(), fetchProfile(), updateProfile(), logout()
  */
 export default function useAuth() {
     const dispatch   = useDispatch();
@@ -30,8 +25,10 @@ export default function useAuth() {
         async (credentials) => {
             const result = await dispatch(loginThunk(credentials));
             if (loginThunk.fulfilled.match(result)) {
-                navigate("/dashboard", { replace: true });
-                return { success: true };
+                const userObj = result.payload?.user;
+                const targetPath = getRoleDashboardPath(userObj?.role);
+                navigate(targetPath, { replace: true });
+                return { success: true, user: userObj };
             }
             return { success: false, error: result.payload };
         },
@@ -43,8 +40,15 @@ export default function useAuth() {
         async (data) => {
             const result = await dispatch(registerThunk(data));
             if (registerThunk.fulfilled.match(result)) {
-                navigate("/dashboard", { replace: true });
-                return { success: true };
+                const userObj = result.payload?.user;
+                // If user is pending approval or not admin, show status page or role dashboard
+                if (userObj?.status === 'pending' || userObj?.isApproved === false) {
+                    navigate("/account-status", { replace: true });
+                } else {
+                    const targetPath = getRoleDashboardPath(userObj?.role);
+                    navigate(targetPath, { replace: true });
+                }
+                return { success: true, user: userObj };
             }
             return { success: false, error: result.payload };
         },
@@ -122,4 +126,3 @@ export default function useAuth() {
         clearAllErrors,
     };
 }
-

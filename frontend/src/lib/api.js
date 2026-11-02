@@ -4,6 +4,7 @@ import { Config } from "../config/Config";
 export const api = axios.create({
     baseURL: `${Config.BACKEND_URL}/api/v1`,
     timeout: 10000,
+    withCredentials: true,
     headers: { "Content-Type": "application/json" },
 });
 
@@ -11,7 +12,7 @@ export const api = axios.create({
 api.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem("ems_token");
-        if (token) {
+        if (token && token !== "undefined" && token !== "null") {
             config.headers.Authorization = `Bearer ${token}`;
         }
         return config;
@@ -24,10 +25,12 @@ api.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response?.status === 401) {
-            /* Token expired — clear local session and redirect */
-            localStorage.removeItem("ems_token");
-            localStorage.removeItem("ems_user");
-            window.location.href = "/login";
+            const currentPath = window.location.pathname;
+            if (currentPath !== "/login" && currentPath !== "/register") {
+                localStorage.removeItem("ems_token");
+                localStorage.removeItem("ems_user");
+                window.location.href = "/login";
+            }
         }
         return Promise.reject(error);
     }

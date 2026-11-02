@@ -6,8 +6,9 @@ import Button from "../../../components/ui/Button";
 
 /* ── Avatar initials ── */
 function Avatar({ user, size = "lg" }) {
-    const initials = user?.name
-        ? user.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
+    const displayName = user?.fullName || user?.name || user?.username || "";
+    const initials = displayName
+        ? displayName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
         : "?";
 
     const dims = size === "lg"
@@ -17,7 +18,7 @@ function Avatar({ user, size = "lg" }) {
     return (
         <div className={`${dims} rounded-full bg-[var(--primary)] text-white font-bold flex items-center justify-center shrink-0`}>
             {user?.avatar ? (
-                <img src={user.avatar} alt={user.name} className="w-full h-full rounded-full object-cover" />
+                <img src={user.avatar} alt={displayName} className="w-full h-full rounded-full object-cover" />
             ) : initials}
         </div>
     );
@@ -58,46 +59,53 @@ function RoleBadge({ role }) {
 
 export default function Profile() {
     const {
-        user, profileLoading, updateLoading, updateSuccess,
+        user, profileLoading, updateLoading,
         updateProfileError, fetchProfile, updateProfile, logout,
     } = useAuth();
 
-    const [tab, setTab]             = useState("overview");  // "overview" | "edit"
-    const [form, setForm]           = useState({});
+    const [tab, setTab] = useState("overview");  // "overview" | "edit"
+    const [form, setForm] = useState({
+        fullName: user?.fullName || user?.name || "",
+        username: user?.username || "",
+        email: user?.email || "",
+        phone: user?.mobile || user?.phone || "",
+        address: user?.address || "",
+        position: user?.position || "",
+    });
     const [successMsg, setSuccessMsg] = useState("");
 
     /* load latest profile on mount */
-    useEffect(() => { fetchProfile(); }, []);
-
-    /* populate form when user loads */
     useEffect(() => {
-        if (user) {
-            setForm({
-                name:     user.name     ?? "",
-                email:    user.email    ?? "",
-                phone:    user.phone    ?? "",
-                address:  user.address  ?? "",
-                position: user.position ?? "",
-            });
-        }
-    }, [user]);
+        fetchProfile();
+    }, [fetchProfile]);
 
-    /* success toast */
-    useEffect(() => {
-        if (updateSuccess) {
-            setSuccessMsg("Profile updated successfully!");
-            setTab("overview");
-            const t = setTimeout(() => setSuccessMsg(""), 3500);
-            return () => clearTimeout(t);
-        }
-    }, [updateSuccess]);
+    const handleStartEdit = () => {
+        setForm({
+            fullName: user?.fullName || user?.name || "",
+            username: user?.username || "",
+            email: user?.email || "",
+            phone: user?.mobile || user?.phone || "",
+            address: user?.address || "",
+            position: user?.position || "",
+        });
+        setTab("edit");
+    };
 
     const handleChange = (e) =>
         setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
     const handleSave = async (e) => {
         e.preventDefault();
-        await updateProfile(form);
+        const res = await updateProfile({
+            fullName: form.fullName,
+            username: form.username,
+            mobile: form.phone,
+        });
+        if (res?.success) {
+            setSuccessMsg("Profile updated successfully!");
+            setTab("overview");
+            setTimeout(() => setSuccessMsg(""), 3500);
+        }
     };
 
     const inputCls = [
@@ -152,7 +160,7 @@ export default function Profile() {
                             </div>
 
                             <h2 className="text-base font-bold text-[var(--text-primary)] mb-1">
-                                {user?.name ?? "—"}
+                                {user?.fullName || user?.name || user?.username || "—"}
                             </h2>
                             <p className="text-sm text-[var(--text-secondary)] mb-3">
                                 {user?.email ?? "—"}
@@ -171,7 +179,7 @@ export default function Profile() {
                                 <Button
                                     variant="outline"
                                     className="w-full"
-                                    onClick={() => setTab(tab === "edit" ? "overview" : "edit")}
+                                    onClick={() => (tab === "edit" ? setTab("overview") : handleStartEdit())}
                                 >
                                     {tab === "edit" ? "Cancel editing" : "Edit Profile"}
                                 </Button>
@@ -216,9 +224,10 @@ export default function Profile() {
                                 <Card.Title>Personal Information</Card.Title>
                             </Card.Header>
                             <Card.Body>
-                                <InfoRow icon={User}     label="Full Name"  value={user?.name} />
+                                <InfoRow icon={User}     label="Full Name"  value={user?.fullName || user?.name} />
+                                <InfoRow icon={User}     label="Username"   value={user?.username ? `@${user.username}` : null} />
                                 <InfoRow icon={Mail}     label="Email"      value={user?.email} />
-                                <InfoRow icon={Phone}    label="Phone"      value={user?.phone} />
+                                <InfoRow icon={Phone}    label="Phone / Mobile" value={user?.mobile || user?.phone} />
                                 <InfoRow icon={Briefcase} label="Position"  value={user?.position} />
                                 <InfoRow icon={MapPin}   label="Address"    value={user?.address} />
                                 <InfoRow icon={Shield}   label="Role"       value={user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : null} />
@@ -238,12 +247,21 @@ export default function Profile() {
                                 )}
 
                                 <form onSubmit={handleSave} className="space-y-4">
-                                    {/* Name */}
+                                    {/* Full Name */}
                                     <div className="flex flex-col gap-1.5">
                                         <label className="text-sm font-medium text-[var(--text-primary)]">Full Name</label>
                                         <div className="relative flex items-center">
                                             <span className="absolute left-3 pointer-events-none text-[var(--text-muted)]"><User size={15} /></span>
-                                            <input name="name" value={form.name} onChange={handleChange} placeholder="John Doe" className={`${inputCls} pl-9`} />
+                                            <input name="fullName" value={form.fullName} onChange={handleChange} placeholder="John Doe" className={`${inputCls} pl-9`} />
+                                        </div>
+                                    </div>
+
+                                    {/* Username */}
+                                    <div className="flex flex-col gap-1.5">
+                                        <label className="text-sm font-medium text-[var(--text-primary)]">Username</label>
+                                        <div className="relative flex items-center">
+                                            <span className="absolute left-3 pointer-events-none text-[var(--text-muted)]"><User size={15} /></span>
+                                            <input name="username" value={form.username} onChange={handleChange} placeholder="johndoe123" className={`${inputCls} pl-9`} />
                                         </div>
                                     </div>
 
@@ -258,21 +276,12 @@ export default function Profile() {
                                         <p className="text-xs text-[var(--text-muted)]">Email cannot be changed</p>
                                     </div>
 
-                                    {/* Phone & Position */}
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div className="flex flex-col gap-1.5">
-                                            <label className="text-sm font-medium text-[var(--text-primary)]">Phone</label>
-                                            <div className="relative flex items-center">
-                                                <span className="absolute left-3 pointer-events-none text-[var(--text-muted)]"><Phone size={15} /></span>
-                                                <input name="phone" value={form.phone} onChange={handleChange} placeholder="+1 234 567 8900" className={`${inputCls} pl-9`} />
-                                            </div>
-                                        </div>
-                                        <div className="flex flex-col gap-1.5">
-                                            <label className="text-sm font-medium text-[var(--text-primary)]">Position</label>
-                                            <div className="relative flex items-center">
-                                                <span className="absolute left-3 pointer-events-none text-[var(--text-muted)]"><Briefcase size={15} /></span>
-                                                <input name="position" value={form.position} onChange={handleChange} placeholder="Software Engineer" className={`${inputCls} pl-9`} />
-                                            </div>
+                                    {/* Phone / Mobile */}
+                                    <div className="flex flex-col gap-1.5">
+                                        <label className="text-sm font-medium text-[var(--text-primary)]">Phone / Mobile</label>
+                                        <div className="relative flex items-center">
+                                            <span className="absolute left-3 pointer-events-none text-[var(--text-muted)]"><Phone size={15} /></span>
+                                            <input name="phone" value={form.phone} onChange={handleChange} placeholder="+1 234 567 8900" className={`${inputCls} pl-9`} />
                                         </div>
                                     </div>
 

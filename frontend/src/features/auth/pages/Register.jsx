@@ -18,7 +18,9 @@ export default function Register() {
     const [showCPwd, setShowCPwd] = useState(false);
     const [errors, setErrors] = useState({});
 
-    useEffect(() => () => clearAllErrors(), []);
+    useEffect(() => {
+        return () => clearAllErrors();
+    }, [clearAllErrors]);
 
     const validate = () => {
         const e = {};
@@ -50,7 +52,8 @@ export default function Register() {
         e.preventDefault();
         const errs = validate();
         if (Object.keys(errs).length) { setErrors(errs); return; }
-        const { confirmPassword, ...payload } = form;
+        const payload = { ...form };
+        delete payload.confirmPassword;
         await register(payload);
     };
 

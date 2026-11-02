@@ -1,44 +1,61 @@
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Menu, Bell, User, LogOut, Settings, ChevronDown } from "lucide-react";
+import { Menu, Bell, User, LogOut, Settings, ChevronDown, Shield } from "lucide-react";
 import ThemeToggle from "../ui/ThemeToggle";
 import Breadcrumbs from "./Breadcrumbs";
 import MobileSidebar from "./MobileSidebar";
 import useAuth from "../../features/auth/hooks/useAuth";
+import { normalizeRole, ROLE_LABELS } from "../../constants/roles";
 
 /* ── User Avatar ── */
 function UserAvatar({ user }) {
-    const initials = user?.name
-        ? user.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
-        : "AD";
+    const displayName = user?.fullName || user?.name || "User";
+    const initials = displayName
+        .split(" ")
+        .map((w) => w[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase();
+
     return (
-        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[var(--primary)] text-white text-xs font-bold shrink-0">
-            {user?.avatar
-                ? <img src={user.avatar} alt={initials} className="w-full h-full rounded-full object-cover" />
-                : initials}
+        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[var(--primary)] text-white text-xs font-bold shrink-0 shadow-sm">
+            {user?.avatar ? (
+                <img src={user.avatar} alt={initials} className="w-full h-full rounded-full object-cover" />
+            ) : (
+                initials
+            )}
         </div>
     );
 }
 
 /* ── Profile Dropdown ── */
 function ProfileDropdown({ user, onClose, logout }) {
+    const roleKey = normalizeRole(user?.role);
+    const roleLabel = ROLE_LABELS[roleKey] || user?.role || "Employee";
+
     return (
         <div
             className={[
-                "absolute right-0 top-full mt-2 w-56 z-50",
+                "absolute right-0 top-full mt-2 w-60 z-50",
                 "bg-[var(--surface)] border border-[var(--border)]",
                 "rounded-[var(--radius-card)] shadow-[var(--shadow-lg)]",
                 "animate-slide-in-up overflow-hidden",
             ].join(" ")}
         >
             {/* User info */}
-            <div className="px-4 py-3 border-b border-[var(--border)]">
+            <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--surface-secondary)]">
                 <p className="text-sm font-semibold text-[var(--text-primary)] truncate">
-                    {user?.name ?? "Admin User"}
+                    {user?.fullName || user?.name || "User"}
                 </p>
                 <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">
-                    {user?.email ?? "admin@company.com"}
+                    {user?.email || "user@company.com"}
                 </p>
+                <div className="mt-2 flex items-center gap-1.5">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-[var(--primary-soft)] text-[var(--primary)]">
+                        <Shield size={10} />
+                        {roleLabel}
+                    </span>
+                </div>
             </div>
 
             {/* Menu items */}
@@ -65,7 +82,10 @@ function ProfileDropdown({ user, onClose, logout }) {
             <div className="border-t border-[var(--border)] py-1">
                 <button
                     type="button"
-                    onClick={() => { onClose(); logout(); }}
+                    onClick={() => {
+                        onClose();
+                        logout();
+                    }}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--danger)] hover:bg-[var(--danger-soft)] transition-colors duration-150"
                 >
                     <LogOut size={15} />
@@ -77,10 +97,13 @@ function ProfileDropdown({ user, onClose, logout }) {
 }
 
 export default function Topbar() {
-    const { user, logout }       = useAuth();
-    const [mobileOpen, setMobileOpen]   = useState(false);
+    const { user, logout } = useAuth();
+    const [mobileOpen, setMobileOpen] = useState(false);
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const dropdownRef = useRef(null);
+
+    const roleKey = normalizeRole(user?.role);
+    const roleLabel = ROLE_LABELS[roleKey] || "User";
 
     /* Close dropdown on outside click */
     useEffect(() => {
@@ -93,6 +116,8 @@ export default function Topbar() {
         document.addEventListener("mousedown", handler);
         return () => document.removeEventListener("mousedown", handler);
     }, [dropdownOpen]);
+
+    const firstName = (user?.fullName || user?.name || "User").split(" ")[0];
 
     return (
         <>
@@ -109,7 +134,6 @@ export default function Topbar() {
             >
                 {/* ── Left ── */}
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                    {/* Hamburger — mobile only */}
                     <button
                         type="button"
                         onClick={() => setMobileOpen(true)}
@@ -123,6 +147,12 @@ export default function Topbar() {
 
                 {/* ── Right ── */}
                 <div className="flex items-center gap-2 shrink-0">
+                    {/* Role badge */}
+                    <span className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[var(--primary-soft)] text-[var(--primary)] border border-[var(--border)]">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--primary)]" />
+                        {roleLabel}
+                    </span>
+
                     {/* Notifications */}
                     <button
                         type="button"
@@ -146,8 +176,8 @@ export default function Topbar() {
                             aria-expanded={dropdownOpen}
                         >
                             <UserAvatar user={user} />
-                            <span className="hidden sm:block text-sm font-medium text-[var(--text-primary)] max-w-[100px] truncate">
-                                {user?.name?.split(" ")[0] ?? "Admin"}
+                            <span className="hidden sm:block text-sm font-medium text-[var(--text-primary)] max-w-[110px] truncate">
+                                {firstName}
                             </span>
                             <ChevronDown
                                 size={14}

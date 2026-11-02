@@ -155,9 +155,9 @@ export const getProfile = asyncHandler(async (req, res) => {
 // PATCH /api/v1/auth/profile  [Protected]
 // ─────────────────────────────────────────────
 export const editProfile = asyncHandler(async (req, res) => {
-  const { fullName, username } = req.body;
+  const { fullName, username, mobile } = req.body;
 
-  const user = await editUserProfile(req.user.id, { fullName, username });
+  const user = await editUserProfile(req.user.id, { fullName, username, mobile });
 
   return res.status(200).json(new ApiResponse(200, user, 'Profile updated successfully'));
 });

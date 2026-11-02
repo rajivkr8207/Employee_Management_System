@@ -58,12 +58,14 @@ const authSlice = createSlice({
                 state.loginError  = null;
             })
             .addCase(loginThunk.fulfilled, (state, { payload }) => {
-                state.loginStatus    = "succeeded";
-                state.user           = payload.user;
-                state.token          = payload.token;
-                state.isAuthenticated = true;
-                localStorage.setItem("ems_token", payload.token);
-                localStorage.setItem("ems_user",  JSON.stringify(payload.user));
+                state.loginStatus     = "succeeded";
+                const user = payload?.user || (payload?._id ? payload : null);
+                const token = payload?.accessToken || payload?.token;
+                state.user            = user;
+                state.token           = token || state.token;
+                state.isAuthenticated = !!(user || token || state.token);
+                if (token) localStorage.setItem("ems_token", token);
+                if (user) localStorage.setItem("ems_user",  JSON.stringify(user));
             })
             .addCase(loginThunk.rejected, (state, { payload }) => {
                 state.loginStatus = "failed";
@@ -78,11 +80,15 @@ const authSlice = createSlice({
             })
             .addCase(registerThunk.fulfilled, (state, { payload }) => {
                 state.registerStatus  = "succeeded";
-                state.user            = payload.user;
-                state.token           = payload.token;
-                state.isAuthenticated = true;
-                localStorage.setItem("ems_token", payload.token);
-                localStorage.setItem("ems_user",  JSON.stringify(payload.user));
+                const user = payload?.user || (payload?._id ? payload : null);
+                const token = payload?.accessToken || payload?.token;
+                state.user            = user;
+                if (token) {
+                    state.token = token;
+                    state.isAuthenticated = true;
+                    localStorage.setItem("ems_token", token);
+                }
+                if (user) localStorage.setItem("ems_user",  JSON.stringify(user));
             })
             .addCase(registerThunk.rejected, (state, { payload }) => {
                 state.registerStatus = "failed";
@@ -97,8 +103,11 @@ const authSlice = createSlice({
             })
             .addCase(fetchProfileThunk.fulfilled, (state, { payload }) => {
                 state.profileStatus = "succeeded";
-                state.user          = payload;
-                localStorage.setItem("ems_user", JSON.stringify(payload));
+                const user = payload?.user || (payload?._id ? payload : payload);
+                if (user && typeof user === "object") {
+                    state.user = user;
+                    localStorage.setItem("ems_user", JSON.stringify(user));
+                }
             })
             .addCase(fetchProfileThunk.rejected, (state, { payload }) => {
                 state.profileStatus = "failed";
@@ -113,8 +122,11 @@ const authSlice = createSlice({
             })
             .addCase(updateProfileThunk.fulfilled, (state, { payload }) => {
                 state.updateProfileStatus = "succeeded";
-                state.user                = payload;
-                localStorage.setItem("ems_user", JSON.stringify(payload));
+                const user = payload?.user || (payload?._id ? payload : payload);
+                if (user && typeof user === "object") {
+                    state.user = user;
+                    localStorage.setItem("ems_user", JSON.stringify(user));
+                }
             })
             .addCase(updateProfileThunk.rejected, (state, { payload }) => {
                 state.updateProfileStatus = "failed";

@@ -1,14 +1,15 @@
-
 import { Navigate, Outlet } from "react-router-dom";
 import { useSelector } from "react-redux";
+import { getRoleDashboardPath } from "../../../constants/roles";
 
 export default function PublicRoute() {
-    const isAuthenticated = useSelector(
-        (state) => state.auth.isAuthenticated
+    const { isAuthenticated, user } = useSelector(
+        (state) => state.auth
     );
 
     if (isAuthenticated) {
-        return <Navigate to="/dashboard" replace />;
+        const redirectPath = getRoleDashboardPath(user?.role);
+        return <Navigate to={redirectPath} replace />;
     }
 
     return <Outlet />;

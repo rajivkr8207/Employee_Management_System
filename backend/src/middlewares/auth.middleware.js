@@ -6,7 +6,10 @@ import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 export const verifyJWT = asyncHandler(async (req, res, next) => {
-  const token = req.cookies?.accessToken;
+  const token =
+    req.cookies?.accessToken ||
+    req.header('Authorization')?.replace('Bearer ', '') ||
+    req.headers?.authorization?.replace('Bearer ', '');
 
   if (!token) {
     throw new ApiError(401, 'Authentication is required');
@@ -21,11 +24,20 @@ export const verifyJWT = asyncHandler(async (req, res, next) => {
 
   const user = await User.findById(decoded.id);
   if (!user) throw new ApiError(401, 'User account was not found');
-  if (!user.isActive || user.isBlocked || !user.isApproved) {
-    throw new ApiError(403, 'Account is not active or approved');
+  if (!user.isActive || user.isBlocked) {
+    throw new ApiError(403, 'Account is not active or blocked');
   }
 
-  req.user = { id: user.id, role: user.role, email: user.email };
+  // Allow pending accounts to access /auth/profile and /auth/logout
+  const isProfileOrLogout =
+    req.originalUrl?.includes('/auth/profile') ||
+    req.originalUrl?.includes('/auth/logout');
+
+  if (!user.isApproved && !isProfileOrLogout) {
+    throw new ApiError(403, 'Account is awaiting administrator approval');
+  }
+
+  req.user = { id: user.id, role: user.role, email: user.email, isApproved: user.isApproved };
   return next();
 });
 

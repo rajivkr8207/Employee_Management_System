@@ -6,19 +6,25 @@ import useAuth from "../hooks/useAuth";
 export default function Login() {
     const { login, loginLoading, loginError, clearAllErrors } = useAuth();
 
-    const [form, setForm]       = useState({ email: "", password: "" });
+    const [form, setForm] = useState({ identifier: "", password: "" });
     const [showPwd, setShowPwd] = useState(false);
-    const [errors, setErrors]   = useState({});
+    const [errors, setErrors] = useState({});
 
     /* clear redux error on unmount */
-    useEffect(() => () => clearAllErrors(), []);
+    useEffect(() => {
+        return () => clearAllErrors();
+    }, [clearAllErrors]);
 
     const validate = () => {
         const e = {};
-        if (!form.email)    e.email    = "Email is required";
-        else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = "Enter a valid email";
-        if (!form.password) e.password = "Password is required";
-        else if (form.password.length < 6) e.password = "At least 6 characters";
+        if (!form.identifier?.trim()) {
+            e.identifier = "Email or username is required";
+        }
+        if (!form.password) {
+            e.password = "Password is required";
+        } else if (form.password.length < 6) {
+            e.password = "At least 6 characters";
+        }
         return e;
     };
 
@@ -117,7 +123,7 @@ export default function Login() {
                     <form onSubmit={handleSubmit} noValidate className="space-y-5">
                         {/* Email */}
                         <div className="flex flex-col gap-1.5">
-                            <label htmlFor="email" className="text-sm font-medium text-[var(--text-primary)]">
+                            <label htmlFor="identifier" className="text-sm font-medium text-[var(--text-primary)]">
                                 Email address <span className="text-[var(--danger)]">*</span>
                             </label>
                             <div className="relative flex items-center">
@@ -125,11 +131,11 @@ export default function Login() {
                                     <Mail size={15} />
                                 </span>
                                 <input
-                                    id="email"
-                                    name="email"
-                                    type="email"
-                                    autoComplete="email"
-                                    value={form.email}
+                                    id="identifier"
+                                    name="identifier"
+                                    type="identifier"
+                                    autoComplete="identifier"
+                                    value={form.identifier}
                                     onChange={handleChange}
                                     placeholder="you@company.com"
                                     className={[
@@ -138,14 +144,14 @@ export default function Login() {
                                         "placeholder:text-[var(--text-muted)]",
                                         "transition-colors duration-150",
                                         "focus:outline-none focus:ring-2",
-                                        errors.email
+                                        errors.identifier
                                             ? "border-[var(--danger)] focus:ring-[var(--danger-soft)] focus:border-[var(--danger)]"
                                             : "border-[var(--border)] focus:border-[var(--primary)] focus:ring-[var(--primary-soft)]",
                                     ].join(" ")}
                                 />
                             </div>
-                            {errors.email && (
-                                <p className="text-xs text-[var(--danger)]">{errors.email}</p>
+                            {errors.identifier && (
+                                <p className="text-xs text-[var(--danger)]">{errors.identifier}</p>
                             )}
                         </div>
 

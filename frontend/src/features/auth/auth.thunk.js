@@ -14,11 +14,10 @@ function extractError(error) {
 /* ── Login ── */
 export const loginThunk = createAsyncThunk(
     "auth/login",
-    async ({ email, password }, { rejectWithValue }) => {
+    async ({ identifier, password }, { rejectWithValue }) => {
         try {
-            const { data } = await api.post("/auth/login", { email, password });
-            // Expected: { token, user: { id, name, email, role, avatar, ... } }
-            return data;
+            const { data } = await api.post("/auth/login", { identifier, password });
+            return data?.data || data;
         } catch (err) {
             return rejectWithValue(extractError(err));
         }
@@ -31,7 +30,7 @@ export const registerThunk = createAsyncThunk(
     async ({ fullName, email, password, role, mobile, username }, { rejectWithValue }) => {
         try {
             const { data } = await api.post("/auth/register", { fullName, email, password, role, mobile, username });
-            return data;
+            return data?.data || data;
         } catch (err) {
             return rejectWithValue(extractError(err));
         }
@@ -41,13 +40,10 @@ export const registerThunk = createAsyncThunk(
 /* ── Fetch current user profile ── */
 export const fetchProfileThunk = createAsyncThunk(
     "auth/fetchProfile",
-    async (_, { rejectWithValue, getState }) => {
+    async (_, { rejectWithValue }) => {
         try {
-            const token = getState().auth.token;
-            const { data } = await api.get("/auth/me", {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            return data;
+            const { data } = await api.get("/auth/profile");
+            return data?.data || data;
         } catch (err) {
             return rejectWithValue(extractError(err));
         }
@@ -57,13 +53,15 @@ export const fetchProfileThunk = createAsyncThunk(
 /* ── Update profile ── */
 export const updateProfileThunk = createAsyncThunk(
     "auth/updateProfile",
-    async (formData, { rejectWithValue, getState }) => {
+    async (formData, { rejectWithValue }) => {
         try {
-            const token = getState().auth.token;
-            const { data } = await api.put("/auth/me", formData, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            return data;
+            const payload = {
+                ...(formData.fullName || formData.name ? { fullName: formData.fullName || formData.name } : {}),
+                ...(formData.username ? { username: formData.username } : {}),
+                ...(formData.mobile || formData.phone ? { mobile: formData.mobile || formData.phone } : {}),
+            };
+            const { data } = await api.patch("/auth/profile", payload);
+            return data?.data || data;
         } catch (err) {
             return rejectWithValue(extractError(err));
         }
@@ -73,12 +71,9 @@ export const updateProfileThunk = createAsyncThunk(
 /* ── Logout (calls API to invalidate token if needed) ── */
 export const logoutThunk = createAsyncThunk(
     "auth/logout",
-    async (_, { getState }) => {
+    async () => {
         try {
-            const token = getState().auth.token;
-            await api.post("/auth/logout", {}, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            await api.post("/auth/logout");
         } catch {
             // Fail silently — clear local state regardless
         }
