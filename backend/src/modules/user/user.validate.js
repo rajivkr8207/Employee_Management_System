@@ -148,6 +148,12 @@ export const editProfileValidation = [
     .isAlphanumeric()
     .withMessage('Username can only contain letters and numbers')
     .toLowerCase(),
+
+  body('mobile')
+    .optional()
+    .trim()
+    .isMobilePhone()
+    .withMessage('Please provide a valid mobile number'),
   validate,
 ];
 

@@ -35,14 +35,13 @@ const cookieClearOptions = {
 // ─────────────────────────────────────────────
 export const register = asyncHandler(async (req, res) => {
   const { fullName, username, email, password, mobile } = req.body;
-  const image = req.file ? req.file.path : null;
+  // const image = req.file ? req.file.path : null;
   const user = await registerUser({
     fullName,
     username,
     email,
     password,
     mobile,
-    image,
   });
   return res.status(201).json(new ApiResponse(201, { user }, 'User registered successfully'));
 });
@@ -156,9 +155,9 @@ export const getProfile = asyncHandler(async (req, res) => {
 // PATCH /api/v1/auth/profile  [Protected]
 // ─────────────────────────────────────────────
 export const editProfile = asyncHandler(async (req, res) => {
-  const { fullName, username } = req.body;
+  const { fullName, username, mobile } = req.body;
 
-  const user = await editUserProfile(req.user.id, { fullName, username });
+  const user = await editUserProfile(req.user.id, { fullName, username, mobile });
 
   return res.status(200).json(new ApiResponse(200, user, 'Profile updated successfully'));
 });

@@ -40,7 +40,7 @@ const authRouter = Router();
  * @desc    Register an employee account and send an email OTP
  * @access  Public
  */
-authRouter.post('/register', registerValidation, register);
+authRouter.post('/register', register);
 
 /**
  * @route   POST /api/v1/auth/verify-otp
