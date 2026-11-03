@@ -125,15 +125,37 @@ export const userVerificationService = {
      * Fetch all user verification records
      */
     async getUsers(tab = "all") {
+        let dbUsers = [];
         try {
-            // First try backend API endpoint
-            const res = await api.get(`/admin/user-verifications?status=${tab}`);
-            if (res.data?.data) return res.data.data;
+            const res = await api.get("/auth/store-admin/pending");
+            const rawUsers = res.data?.data?.users || res.data?.data || [];
+            dbUsers = rawUsers.map((u) => ({
+                id: u._id,
+                fullName: u.fullName,
+                username: u.username,
+                email: u.email,
+                mobile: u.mobile || "N/A",
+                role: u.role,
+                requestedRole: "Store Admin",
+                registrationDate: u.createdAt || new Date().toISOString(),
+                status: "pending",
+                rejectionReason: null,
+                notes: "Registered via Admin Invitation link",
+                documents: [
+                    { type: "Official Invitation", name: "Token Verified", verified: true },
+                ],
+                avatar: null,
+                address: "Pending Store Setup",
+            }));
         } catch {
-            // Graceful fallback to persistent mock data for UI testing
+            // ignore
         }
 
-        const all = getStoredMockUsers();
+        const stored = getStoredMockUsers();
+        const storedEmails = new Set(stored.map((u) => u.email.toLowerCase()));
+        const uniqueDbUsers = dbUsers.filter((u) => !storedEmails.has(u.email.toLowerCase()));
+        const all = [...uniqueDbUsers, ...stored];
+
         if (tab === "all") return all;
         return all.filter((u) => u.status === tab);
     },
@@ -143,11 +165,9 @@ export const userVerificationService = {
      */
     async verifyUser(userId) {
         try {
-            // Try backend API endpoint
-            const res = await api.patch(`/admin/user-verifications/${userId}/verify`);
-            if (res.data?.data) return res.data.data;
+            await api.patch(`/auth/store-admin/${userId}/approve`);
         } catch {
-            // Mock update
+            // Mock update fallback
         }
 
         const users = getStoredMockUsers();

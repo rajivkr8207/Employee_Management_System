@@ -16,6 +16,7 @@ import {
     Activity,
     Clock,
     Briefcase,
+    Mail,
 } from "lucide-react";
 import { normalizeRole, ROLES, ROLE_LABELS } from "../../constants/roles";
 
@@ -26,6 +27,12 @@ function getNavSections(role, pendingUsersCount, pendingStoresCount, pendingMana
                 heading: "Administration",
                 items: [
                     { label: "Dashboard", icon: LayoutDashboard, to: "/admin/dashboard" },
+                    { label: "Invite Store Admin", icon: Mail, to: "/admin/invite-store-admin" },
+                    {
+                        label: "Organization Verification",
+                        icon: Building2,
+                        to: "/admin/organization-verification",
+                    },
                     {
                         label: "User Verification",
                         icon: UserCheck,
@@ -74,6 +81,7 @@ function getNavSections(role, pendingUsersCount, pendingStoresCount, pendingMana
                 heading: "Store Admin Portal",
                 items: [
                     { label: "Dashboard", icon: LayoutDashboard, to: "/store-admin/dashboard" },
+                    { label: "My Organization", icon: Building2, to: "/store-admin/organization" },
                     { label: "Assigned Stores", icon: Store, to: "/store-admin/stores" },
                     { label: "Store Managers", icon: ShieldCheck, to: "/store-admin/managers" },
                     { label: "Employees", icon: Users, to: "/store-admin/employees" },

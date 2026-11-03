@@ -3,6 +3,7 @@ import { asyncHandler } from '../../utils/asyncHandler.js';
 import {
   createOrganization,
   getOwnerOrganization,
+  updateOwnerOrganization,
   listPendingOrganizations,
   updateOrganizationApproval,
 } from './organization.service.js';
@@ -17,6 +18,11 @@ export const createOrganizationForOwner = asyncHandler(async (req, res) => {
 export const getMyOrganization = asyncHandler(async (req, res) => {
   const organization = await getOwnerOrganization(req.user.id);
   return res.status(200).json(new ApiResponse(200, { organization }, 'Organization fetched'));
+});
+
+export const updateMyOrganization = asyncHandler(async (req, res) => {
+  const organization = await updateOwnerOrganization(req.user.id, req.body);
+  return res.status(200).json(new ApiResponse(200, { organization }, 'Organization updated'));
 });
 
 export const getPendingOrganizations = asyncHandler(async (req, res) => {

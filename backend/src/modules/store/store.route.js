@@ -6,11 +6,14 @@ import {
   getStoreById,
   getStores,
   updateStoreForAdmin,
+  createManagerForStore,
+  getManagersForStore,
 } from './store.controller.js';
 import {
   createStoreValidation,
   storeIdParamValidation,
   updateStoreValidation,
+  createStoreManagerValidation,
 } from './store.validate.js';
 
 const storeRouter = Router();
@@ -22,5 +25,11 @@ storeRouter
   .get(storeIdParamValidation, getStoreById)
   .patch(updateStoreValidation, updateStoreForAdmin)
   .delete(storeIdParamValidation, deleteStoreForAdmin);
+
+// Store Admin creates/manages managers for own store
+storeRouter
+  .route('/:storeId/managers')
+  .get(storeIdParamValidation, getManagersForStore)
+  .post(createStoreManagerValidation, createManagerForStore);
 
 export default storeRouter;
