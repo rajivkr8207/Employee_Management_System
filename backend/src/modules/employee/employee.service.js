@@ -6,6 +6,7 @@ import { StoreModel } from '../store/store.model.js';
 import { MembershipModel } from '../membership/membership.model.js';
 import { authorizeOrganizationAccess } from '../membership/membership.service.js';
 import { EmployeeModel } from './employee.model.js';
+import crypto from 'crypto';
 
 const employeeUserFields = 'fullName username email mobile avatar';
 const populateEmployee = (query) =>
@@ -14,7 +15,10 @@ const populateEmployee = (query) =>
     .populate('storeId', 'name code')
     .populate('organizationId', 'name');
 
-const createStaffUser = async ({ fullName, username, email, password, mobile }) => {
+const createStaffUser = async (
+  { fullName, username, email, password, mobile },
+  role = ROLES.EMPLOYEE,
+) => {
   try {
     return await User.create({
       fullName,
@@ -22,7 +26,7 @@ const createStaffUser = async ({ fullName, username, email, password, mobile }) 
       email: email.trim().toLowerCase(),
       password,
       ...(mobile ? { mobile } : {}),
-      role: ROLES.EMPLOYEE,
+      role: role === 'manager' || role === ROLES.MANAGER ? ROLES.MANAGER : ROLES.EMPLOYEE,
       provider: 'local',
       isVerified: true,
       isApproved: true,
@@ -48,39 +52,70 @@ const mapDuplicateKeyError = (error) => {
 
 export const createEmployee = async (employeeData, requesterId) => {
   const {
-    organizationId,
     storeId,
-    storeIds = [storeId],
-    role,
+    role = 'employee',
     membershipStatus = 'active',
     userId,
     user,
   } = employeeData;
-  await authorizeOrganizationAccess({
-    userId: requesterId,
-    organizationId,
-    storeId,
-    allowedRoles: ['owner', 'store_admin'],
-  });
+  let { organizationId, storeIds } = employeeData;
+
+  const requester = await User.findById(requesterId);
+  if (!requester) throw new ApiError(401, 'User account was not found');
+
+  const store = await StoreModel.findById(storeId);
+  if (!store || store.status !== 'active') {
+    throw new ApiError(404, 'The target store was not found or is not active');
+  }
+
+  if (!organizationId) {
+    organizationId = store.organizationId;
+  }
+  if (!storeIds || !storeIds.length) {
+    storeIds = [storeId];
+  }
+
+  // Hierarchy validation:
+  // - Store Admin can create manager or employee on their OWN store
+  // - Store Manager can ONLY create employee on their OWN assigned store
+  if (requester.role === ROLES.STORE_ADMIN) {
+    const isOwned = store.createdBy?.toString() === requesterId.toString();
+    if (!isOwned) {
+      await authorizeOrganizationAccess({
+        userId: requesterId,
+        organizationId,
+        storeId,
+        allowedRoles: ['owner', 'store_admin'],
+      });
+    }
+  } else if (requester.role === ROLES.MANAGER) {
+    if (role === 'manager' || role === ROLES.MANAGER) {
+      throw new ApiError(
+        403,
+        'Store managers cannot create other store managers. Only store administrators can appoint managers.',
+      );
+    }
+    const isAssigned = store.managerId?.toString() === requesterId.toString();
+    if (!isAssigned) {
+      const membership = await MembershipModel.findOne({
+        userId: requesterId,
+        storeIds: storeId,
+        role: 'manager',
+        status: 'active',
+      });
+      if (!membership) {
+        throw new ApiError(403, 'You can only add employees to your own assigned store');
+      }
+    }
+  } else if (requester.role === ROLES.ADMIN) {
+    // Super admin permitted
+  } else {
+    throw new ApiError(403, 'You do not have permission to add staff to this store');
+  }
 
   const uniqueStoreIds = [...new Set(storeIds.map((id) => id.toString()))];
   if (!uniqueStoreIds.includes(storeId.toString())) {
     throw new ApiError(400, 'The employee store must be included in membership storeIds');
-  }
-
-  for (const assignedStoreId of uniqueStoreIds) {
-    await authorizeOrganizationAccess({
-      userId: requesterId,
-      organizationId,
-      storeId: assignedStoreId,
-      allowedRoles: ['owner', 'store_admin'],
-    });
-    const store = await StoreModel.findOne({
-      _id: assignedStoreId,
-      organizationId,
-      status: 'active',
-    }).select('_id');
-    if (!store) throw new ApiError(400, 'Employees can only be assigned to active stores');
   }
 
   let selectedUser;
@@ -99,7 +134,7 @@ export const createEmployee = async (employeeData, requesterId) => {
       throw new ApiError(409, 'This user already has a membership in the organization');
     }
   } else {
-    selectedUser = await createStaffUser(user);
+    selectedUser = await createStaffUser(user, role);
     createdUser = true;
   }
 
@@ -110,24 +145,53 @@ export const createEmployee = async (employeeData, requesterId) => {
       userId: selectedUser._id,
       organizationId,
       storeIds: uniqueStoreIds,
-      role,
+      role: role === ROLES.MANAGER || role === 'manager' ? 'manager' : 'employee',
       status: membershipStatus,
     });
+
+    const employeeCode =
+      employeeData.employeeCode ||
+      (role === 'manager' ? 'MGR-' : 'EMP-') + crypto.randomBytes(3).toString('hex').toUpperCase();
+
     createdEmployee = await EmployeeModel.create({
       organizationId,
       storeId,
       userId: selectedUser._id,
-      employeeCode: employeeData.employeeCode,
-      designation: employeeData.designation,
-      salary: employeeData.salary,
+      employeeCode,
+      designation: employeeData.designation || (role === 'manager' ? 'Store Manager' : 'Employee'),
+      salary: employeeData.salary || 0,
       joiningDate: employeeData.joiningDate,
-      status: employeeData.status,
+      status: employeeData.status || 'active',
     });
+
+    // If appointing a manager, set store.managerId
+    if (role === 'manager' || role === ROLES.MANAGER) {
+      store.managerId = selectedUser._id;
+      await store.save();
+    }
   } catch (error) {
     if (createdEmployee) await EmployeeModel.deleteOne({ _id: createdEmployee._id });
     if (createdMembership) await MembershipModel.deleteOne({ _id: createdMembership._id });
     if (createdUser) await User.deleteOne({ _id: selectedUser._id });
     throw mapDuplicateKeyError(error);
+  }
+
+  // Send onboarding credentials email
+  if (createdUser && user?.password) {
+    try {
+      const Config = (await import('../../config/Config.js')).default;
+      const { MailService } = await import('../../services/mail.service.js');
+      await new MailService().SendStaffCredentialsMail(
+        selectedUser.email,
+        selectedUser.fullName,
+        role === 'manager' ? 'Store Manager' : 'Employee',
+        store.name,
+        user.password,
+        `${Config.frontend_url || 'http://localhost:5173'}/login`,
+      );
+    } catch (err) {
+      console.error('[Staff Credentials Mail Error]:', err.message);
+    }
   }
 
   return populateEmployee(EmployeeModel.findById(createdEmployee._id));

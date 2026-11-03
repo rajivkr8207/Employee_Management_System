@@ -71,20 +71,35 @@ export default function StoreAdminDashboardPage() {
                     </p>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <label className="text-xs font-semibold text-[var(--text-muted)] whitespace-nowrap">
-                        Store View:
-                    </label>
+                <div className="flex flex-wrap items-center gap-3">
                     <select
                         value={selectedStore}
                         onChange={(e) => setSelectedStore(e.target.value)}
-                        className="text-sm px-3 py-1.5 rounded-[var(--radius-control)] bg-[var(--surface)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary)]"
+                        className="text-xs px-2.5 py-1.5 rounded-[var(--radius-control)] bg-[var(--surface)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary)]"
                     >
-                        <option value="all">All Assigned Stores (3)</option>
+                        <option value="all">All Stores ({assignedStores.length})</option>
                         {assignedStores.map((st) => (
                             <option key={st.id} value={st.id}>{st.name}</option>
                         ))}
                     </select>
+                    <Link
+                        to="/store-admin/organization"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--surface)] border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] rounded-lg text-xs font-semibold transition-colors shadow-sm"
+                    >
+                        <Building2 size={14} className="text-indigo-500" /> Organization
+                    </Link>
+                    <Link
+                        to="/store-admin/stores"
+                        className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-sm"
+                    >
+                        <Store size={14} /> My Stores
+                    </Link>
+                    <Link
+                        to="/store-admin/employees"
+                        className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-[var(--surface)] border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] rounded-lg text-xs font-semibold transition-colors shadow-sm"
+                    >
+                        <Users size={14} /> Employees
+                    </Link>
                 </div>
             </div>
 

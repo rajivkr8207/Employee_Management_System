@@ -8,58 +8,37 @@ import crypto from 'crypto';
 import { URL } from 'node:url';
 import { ROLES } from '../../constants/roles.js';
 
-export const registerUser = async ({
-  fullName,
-  username,
-  email,
-  password,
-  mobile,
-  provider = 'local',
-  googleId = null,
-}) => {
-  email = email.trim().toLowerCase();
-  username = username.trim().toLowerCase();
-  const existingUser = await User.findOne({
-    $or: [{ email }, { username }, ...(mobile ? [{ mobile }] : [])],
-  });
-  if (existingUser) {
-    throw new ApiError(409, 'User with this email, username, or mobile already exists');
+export const registerUser = async (registrationData) => {
+  const { token, fullName, username, password, mobile } = registrationData;
+
+  // Direct open self-registration without invitation is disabled
+  if (!token) {
+    throw new ApiError(
+      403,
+      'Direct registration is disabled. You must register using an official administrator invitation link, or be onboarded by your store administrator / manager.',
+    );
   }
 
-  const otp = crypto.randomInt(100000, 1000000).toString();
-  const otpExpire = new Date(Date.now() + 10 * 60 * 1000);
-  const user = await User.create({
-    fullName,
-    username,
-    email,
-    password,
-    ...(mobile ? { mobile } : {}),
-    // avatar: image,
-    role: ROLES.EMPLOYEE,
-    provider,
-    googleId,
-    otp,
-    otpExpire,
-    isVerified: provider !== 'local' || !Config.smtp_host,
-  });
-
-
-  return user;
+  // If token is provided, complete store administrator onboarding
+  return registerStoreAdmin({ token, fullName, username, password, mobile });
 };
 
 export const createStoreAdminInvitation = async (email, invitedBy) => {
-  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedEmail = email?.trim().toLowerCase();
+
+  if (!normalizedEmail) {
+    throw new ApiError(400, 'A valid email address is required');
+  }
+
   const existingUser = await User.findOne({ email: normalizedEmail });
   if (existingUser) {
     throw new ApiError(409, 'An account with this email already exists');
-  }
-  if (!Config.frontend_url) {
-    throw new ApiError(503, 'Frontend URL is not configured');
   }
 
   const token = crypto.randomBytes(32).toString('hex');
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
   const invitation = await StoreAdminInvitation.create({
     email: normalizedEmail,
     tokenHash,
@@ -67,13 +46,18 @@ export const createStoreAdminInvitation = async (email, invitedBy) => {
     invitedBy,
   });
 
-  const invitationUrl = new URL('/register', Config.frontend_url);
+  const frontendBase = Config.frontend_url || 'http://localhost:5173';
+  const invitationUrl = new URL('/register', frontendBase);
   invitationUrl.searchParams.set('token', token);
+
+  let mailResult = { success: true };
   try {
-    await new MailService().SendStoreAdminInvitation(normalizedEmail, invitationUrl.toString());
+    mailResult = await new MailService().SendStoreAdminInvitation(
+      normalizedEmail,
+      invitationUrl.toString(),
+    );
   } catch (error) {
-    await StoreAdminInvitation.findByIdAndDelete(invitation._id);
-    throw error;
+    console.error('[Invitation Mail Failed]:', error.message);
   }
 
   await StoreAdminInvitation.updateMany(
@@ -81,7 +65,12 @@ export const createStoreAdminInvitation = async (email, invitedBy) => {
     { $set: { usedAt: new Date() } },
   );
 
-  return { email: normalizedEmail, expiresAt };
+  return {
+    email: normalizedEmail,
+    expiresAt,
+    invitationLink: invitationUrl.toString(),
+    mailSent: mailResult.success,
+  };
 };
 
 export const verifyStoreAdminInvitation = async (token) => {
@@ -96,17 +85,26 @@ export const verifyStoreAdminInvitation = async (token) => {
     throw new ApiError(400, 'Invitation link is invalid, expired, or already used');
   }
 
-  return { email: invitation.email, expiresAt: invitation.expiresAt };
+  return {
+    email: invitation.email,
+    expiresAt: invitation.expiresAt,
+  };
 };
 
-export const registerStoreAdmin = async ({ token, fullName, username, password, mobile }) => {
+export const registerStoreAdmin = async ({
+  token,
+  fullName,
+  username,
+  password,
+  mobile,
+}) => {
   username = username.trim().toLowerCase();
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
   const invitation = await StoreAdminInvitation.findOne({
     tokenHash,
     expiresAt: { $gt: new Date() },
     usedAt: null,
-  }).select('+tokenHash');
+  }).select('+tokenHash email');
 
   if (!invitation) {
     throw new ApiError(400, 'Invitation link is invalid, expired, or already used');
@@ -129,22 +127,15 @@ export const registerStoreAdmin = async ({ token, fullName, username, password, 
     provider: 'local',
     isVerified: true,
     isApproved: false,
+    isActive: true,
   });
-  const consumedInvitation = await StoreAdminInvitation.updateOne(
-    {
-      _id: invitation._id,
-      usedAt: null,
-      expiresAt: { $gt: new Date() },
-    },
+
+  await StoreAdminInvitation.updateOne(
+    { _id: invitation._id },
     { $set: { usedAt: new Date() } },
   );
 
-  if (consumedInvitation.modifiedCount !== 1) {
-    await User.findByIdAndDelete(user._id);
-    throw new ApiError(400, 'Invitation link is invalid, expired, or already used');
-  }
-
-  return user;
+  return { user };
 };
 
 export const listPendingStoreAdmins = async () =>
@@ -161,7 +152,14 @@ export const approveStoreAdmin = async (id) => {
   if (!user) {
     throw new ApiError(404, 'Pending store administrator was not found');
   }
-  return user;
+
+  try {
+    await new MailService().SendAccountApprovedMail(user.email, user.fullName, 'Store Administrator');
+  } catch (err) {
+    console.error('[Approval Mail Error]:', err.message);
+  }
+
+  return { user };
 };
 
 export const loginUser = async ({ identifier, password }) => {
@@ -196,7 +194,7 @@ export const loginUser = async ({ identifier, password }) => {
   user.refreshTokenVersion += 1;
   const accessToken = user.generateAccessToken();
   const refreshToken = user.generateRefreshToken();
-  user.setRefreshTokenHash(refreshToken);
+  user.refreshTokenHash = refreshToken;
   user.lastLoginAt = new Date();
   await user.save();
 

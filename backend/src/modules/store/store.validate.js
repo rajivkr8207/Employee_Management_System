@@ -139,3 +139,30 @@ export const updateStoreValidation = [
 ];
 
 export const storeIdParamValidation = [storeIdValidation, validate];
+
+export const createStoreManagerValidation = [
+  storeIdValidation,
+  body('fullName')
+    .trim()
+    .notEmpty()
+    .withMessage('Full name is required')
+    .isLength({ min: 2, max: 120 }),
+  body('username')
+    .trim()
+    .matches(/^[a-zA-Z0-9]{3,30}$/)
+    .withMessage('Username must be 3-30 letters or numbers'),
+  body('email').trim().isEmail().withMessage('A valid email is required').toLowerCase(),
+  body('password')
+    .notEmpty()
+    .withMessage('Password is required')
+    .isLength({ min: 6 })
+    .withMessage('Password must be at least 6 characters'),
+  body('mobile')
+    .optional()
+    .trim()
+    .matches(/^[6-9]\d{9}$/)
+    .withMessage('Please enter a valid mobile number'),
+  body('designation').optional().trim(),
+  body('salary').optional().isFloat({ min: 0 }),
+  validate,
+];

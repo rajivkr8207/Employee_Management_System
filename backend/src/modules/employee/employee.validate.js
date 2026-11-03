@@ -46,12 +46,13 @@ export const createEmployeeValidation = [
       );
     })
     .withMessage('Provide either userId or complete new user details and only employee fields'),
-  body('organizationId').isMongoId().withMessage('A valid organization ID is required'),
+  body('organizationId').optional().isMongoId().withMessage('A valid organization ID is required'),
   body('storeId').isMongoId().withMessage('A valid store ID is required'),
   body('storeIds').optional().isArray({ min: 1 }).withMessage('storeIds must be a non-empty array'),
   body('storeIds.*').optional().isMongoId().withMessage('Every store ID must be valid'),
   body('role')
-    .isIn(['manager', 'employee'])
+    .optional()
+    .isIn(['manager', 'employee', 'employ', 'store_admin'])
     .withMessage('Membership role must be manager or employee'),
   body('membershipStatus')
     .optional()

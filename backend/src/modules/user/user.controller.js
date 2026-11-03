@@ -67,10 +67,16 @@ export const inviteStoreAdmin = asyncHandler(async (req, res) => {
 });
 
 export const registerInvitedStoreAdmin = asyncHandler(async (req, res) => {
-  const user = await registerStoreAdmin(req.body);
+  const result = await registerStoreAdmin(req.body);
   return res
     .status(201)
-    .json(new ApiResponse(201, { user }, 'Registration submitted for administrator approval'));
+    .json(
+      new ApiResponse(
+        201,
+        result,
+        'Store Administrator registered successfully. Awaiting administrator approval.',
+      ),
+    );
 });
 
 export const verifyStoreAdminInvitationToken = asyncHandler(async (req, res) => {
@@ -84,8 +90,10 @@ export const getPendingStoreAdmins = asyncHandler(async (req, res) => {
 });
 
 export const approveStoreAdminAccount = asyncHandler(async (req, res) => {
-  const user = await approveStoreAdmin(req.params.userId);
-  return res.status(200).json(new ApiResponse(200, { user }, 'Store administrator approved'));
+  const result = await approveStoreAdmin(req.params.userId);
+  return res
+    .status(200)
+    .json(new ApiResponse(200, result, 'Store administrator approved successfully'));
 });
 // ─────────────────────────────────────────────
 // POST /api/v1/auth/login

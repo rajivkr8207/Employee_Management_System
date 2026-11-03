@@ -3,6 +3,7 @@ import { verifyAdmin, verifyJWT } from '../../middlewares/auth.middleware.js';
 import {
   createOrganizationForOwner,
   getMyOrganization,
+  updateMyOrganization,
   getPendingOrganizations,
   reviewOrganization,
 } from './organization.controller.js';
@@ -16,6 +17,7 @@ const organizationRouter = Router();
 organizationRouter.use(verifyJWT);
 organizationRouter.post('/', createOrganizationValidation, createOrganizationForOwner);
 organizationRouter.get('/mine', getMyOrganization);
+organizationRouter.patch('/mine', updateMyOrganization);
 organizationRouter.get('/pending', verifyAdmin, getPendingOrganizations);
 organizationRouter.patch(
   '/:organizationId/approval',

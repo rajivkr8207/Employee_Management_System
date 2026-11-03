@@ -72,6 +72,24 @@ export const getOwnerOrganization = async (ownerId) => {
   return organization;
 };
 
+export const updateOwnerOrganization = async (ownerId, updateData) => {
+  const updates = pickOrganizationFields(updateData);
+  if (updateData.address && typeof updateData.address === 'object') {
+    updates.address = Object.fromEntries(
+      addressFields
+        .filter((field) => Object.hasOwn(updateData.address, field))
+        .map((field) => [field, updateData.address[field]]),
+    );
+  }
+  const organization = await organizationModel.findOneAndUpdate(
+    { ownerId },
+    { $set: updates },
+    { new: true, runValidators: true },
+  );
+  if (!organization) throw new ApiError(404, 'Organization was not found');
+  return organization;
+};
+
 export const listPendingOrganizations = () =>
   organizationModel
     .find({ verificationStatus: 'pending' })

@@ -17,7 +17,6 @@ import {
 } from './user.controller.js';
 import { verifyAdmin, verifyJWT } from '../../middlewares/auth.middleware.js';
 import {
-  registerValidation,
   loginValidation,
   editProfileValidation,
   changePasswordValidation,

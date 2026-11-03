@@ -5,14 +5,20 @@ import userVerificationReducer from "../features/userVerification/userVerificati
 import storeVerificationReducer from "../features/storeVerification/storeVerificationSlice";
 import managerVerificationReducer from "../features/managerVerification/managerVerificationSlice";
 import adminReducer from "../features/admin/adminSlice";
+import storeReducer from "../features/store/storeSlice";
+import employeeReducer from "../features/employees/employeeSlice";
+import organizationReducer from "../features/organization/organizationSlice";
 
 export const store = configureStore({
-    reducer: {
-        auth: authReducer,
-        dashboard: dashboardReducer,
-        userVerification: userVerificationReducer,
-        storeVerification: storeVerificationReducer,
-        managerVerification: managerVerificationReducer,
-        admin: adminReducer,
-    },
+  reducer: {
+    auth: authReducer,
+    dashboard: dashboardReducer,
+    userVerification: userVerificationReducer,
+    storeVerification: storeVerificationReducer,
+    managerVerification: managerVerificationReducer,
+    admin: adminReducer,
+    store: storeReducer,
+    employees: employeeReducer,
+    organization: organizationReducer,
+  },
 });

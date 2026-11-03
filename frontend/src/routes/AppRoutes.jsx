@@ -27,6 +27,13 @@ import StoreAdminOperationsPage from "../features/dashboard/pages/StoreAdminOper
 import StoreManagerOperationsPage from "../features/dashboard/pages/StoreManagerOperationsPage";
 import EmployeeOperationsPage from "../features/dashboard/pages/EmployeeOperationsPage";
 
+// Dedicated Feature Pages
+import StoreListPage from "../features/store/pages/StoreListPage";
+import EmployeeListPage from "../features/employees/pages/EmployeeListPage";
+import InviteStoreAdminPage from "../features/admin/pages/InviteStoreAdminPage";
+import OrganizationProfilePage from "../features/organization/pages/OrganizationProfilePage";
+import OrganizationVerificationPage from "../features/organization/pages/OrganizationVerificationPage";
+
 // Admin Verification pages
 import UserVerificationPage from "../features/userVerification/pages/UserVerificationPage";
 import StoreVerificationPage from "../features/storeVerification/pages/StoreVerificationPage";
@@ -46,81 +53,122 @@ import NotFoundPage from "../components/Common/NotFoundPage";
  * Dynamically redirects to user's assigned role dashboard
  */
 function DashboardRedirect() {
-    const { user } = useSelector((state) => state.auth);
-    const target = getRoleDashboardPath(user?.role);
-    return <Navigate to={target} replace />;
+  const { user } = useSelector((state) => state.auth);
+  const target = getRoleDashboardPath(user?.role);
+  return <Navigate to={target} replace />;
 }
 
 export default function AppRoutes() {
-    return (
-        <Routes>
-            {/* ── Public Routes (redirect to role dashboard if authenticated) ── */}
-            <Route element={<PublicRoute />}>
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-            </Route>
+  return (
+    <Routes>
+      {/* ── Public Routes (redirect to role dashboard if authenticated) ── */}
+      <Route element={<PublicRoute />}>
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+      </Route>
 
-            {/* ── Account Status Route (Pending / Rejected / Suspended) ── */}
-            <Route path="/account-status" element={<AccountStatusPage />} />
+      {/* ── Account Status Route (Pending / Rejected / Suspended) ── */}
+      <Route path="/account-status" element={<AccountStatusPage />} />
 
-            {/* ── Protected Routes under AppLayout ── */}
-            <Route element={<ProtectedRoute />}>
-                <Route element={<AppLayout />}>
+      {/* ── Protected Routes under AppLayout ── */}
+      <Route element={<ProtectedRoute />}>
+        <Route element={<AppLayout />}>
+          {/* Dynamic root & dashboard redirection */}
+          <Route index element={<DashboardRedirect />} />
+          <Route path="/" element={<DashboardRedirect />} />
+          <Route path="/dashboard" element={<DashboardRedirect />} />
 
-                    {/* Dynamic root & dashboard redirection */}
-                    <Route index element={<DashboardRedirect />} />
-                    <Route path="/" element={<DashboardRedirect />} />
-                    <Route path="/dashboard" element={<DashboardRedirect />} />
+          {/* Common Protected Routes */}
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/settings" element={<Profile />} />
 
-                    {/* Common Protected Routes */}
-                    <Route path="/profile" element={<Profile />} />
-                    <Route path="/settings" element={<Profile />} />
+          {/* ── ADMIN ONLY ROUTES ── */}
+          <Route element={<RoleProtectedRoute allowedRoles={[ROLES.ADMIN]} />}>
+            <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+            <Route path="/admin/invite-store-admin" element={<InviteStoreAdminPage />} />
+            <Route
+              path="/admin/organization-verification"
+              element={<OrganizationVerificationPage />}
+            />
+            <Route path="/admin/user-verification" element={<UserVerificationPage />} />
+            <Route path="/admin/store-verification" element={<StoreVerificationPage />} />
+            <Route path="/admin/manager-verification" element={<ManagerVerificationPage />} />
+            <Route path="/admin/users" element={<AllUsersPage />} />
+            <Route path="/admin/stores" element={<AllStoresPage />} />
+            <Route path="/admin/employees" element={<AllEmployeesPage />} />
+            <Route path="/admin/analytics" element={<ReportsAnalyticsPage />} />
+            <Route path="/admin/activity-logs" element={<ActivityLogsPage />} />
+          </Route>
 
-                    {/* ── ADMIN ONLY ROUTES ── */}
-                    <Route element={<RoleProtectedRoute allowedRoles={[ROLES.ADMIN]} />}>
-                        <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
-                        <Route path="/admin/user-verification" element={<UserVerificationPage />} />
-                        <Route path="/admin/store-verification" element={<StoreVerificationPage />} />
-                        <Route path="/admin/manager-verification" element={<ManagerVerificationPage />} />
-                        <Route path="/admin/users" element={<AllUsersPage />} />
-                        <Route path="/admin/stores" element={<AllStoresPage />} />
-                        <Route path="/admin/employees" element={<AllEmployeesPage />} />
-                        <Route path="/admin/analytics" element={<ReportsAnalyticsPage />} />
-                        <Route path="/admin/activity-logs" element={<ActivityLogsPage />} />
-                    </Route>
+          {/* ── STORE ADMIN ROUTES ── */}
+          <Route element={<RoleProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.STORE_ADMIN]} />}>
+            <Route path="/store-admin/dashboard" element={<StoreAdminDashboardPage />} />
+            <Route path="/store-admin/organization" element={<OrganizationProfilePage />} />
+            <Route path="/store-admin/stores" element={<StoreListPage />} />
+            <Route
+              path="/store-admin/managers"
+              element={<StoreAdminOperationsPage activeSection="managers" />}
+            />
+            <Route path="/store-admin/employees" element={<EmployeeListPage />} />
+            <Route
+              path="/store-admin/attendance"
+              element={<StoreAdminOperationsPage activeSection="attendance" />}
+            />
+            <Route
+              path="/store-admin/leaves"
+              element={<StoreAdminOperationsPage activeSection="leaves" />}
+            />
+          </Route>
 
-                    {/* ── STORE ADMIN ROUTES ── */}
-                    <Route element={<RoleProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.STORE_ADMIN]} />}>
-                        <Route path="/store-admin/dashboard" element={<StoreAdminDashboardPage />} />
-                        <Route path="/store-admin/stores" element={<StoreAdminOperationsPage activeSection="stores" />} />
-                        <Route path="/store-admin/managers" element={<StoreAdminOperationsPage activeSection="managers" />} />
-                        <Route path="/store-admin/employees" element={<StoreAdminOperationsPage activeSection="employees" />} />
-                        <Route path="/store-admin/attendance" element={<StoreAdminOperationsPage activeSection="attendance" />} />
-                        <Route path="/store-admin/leaves" element={<StoreAdminOperationsPage activeSection="leaves" />} />
-                    </Route>
+          {/* ── STORE MANAGER ROUTES ── */}
+          <Route
+            element={
+              <RoleProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.STORE_ADMIN, ROLES.MANAGER]} />
+            }
+          >
+            <Route path="/store-manager/dashboard" element={<StoreManagerDashboardPage />} />
+            <Route path="/store-manager/employees" element={<EmployeeListPage />} />
+            <Route
+              path="/store-manager/attendance"
+              element={<StoreManagerOperationsPage activeSection="attendance" />}
+            />
+            <Route
+              path="/store-manager/leaves"
+              element={<StoreManagerOperationsPage activeSection="leaves" />}
+            />
+            <Route
+              path="/store-manager/shifts"
+              element={<StoreManagerOperationsPage activeSection="shifts" />}
+            />
+          </Route>
 
-                    {/* ── STORE MANAGER ROUTES ── */}
-                    <Route element={<RoleProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.STORE_ADMIN, ROLES.MANAGER]} />}>
-                        <Route path="/store-manager/dashboard" element={<StoreManagerDashboardPage />} />
-                        <Route path="/store-manager/employees" element={<StoreManagerOperationsPage activeSection="employees" />} />
-                        <Route path="/store-manager/attendance" element={<StoreManagerOperationsPage activeSection="attendance" />} />
-                        <Route path="/store-manager/leaves" element={<StoreManagerOperationsPage activeSection="leaves" />} />
-                        <Route path="/store-manager/shifts" element={<StoreManagerOperationsPage activeSection="shifts" />} />
-                    </Route>
+          {/* ── EMPLOYEE ROUTES ── */}
+          <Route
+            element={
+              <RoleProtectedRoute
+                allowedRoles={[ROLES.ADMIN, ROLES.STORE_ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE]}
+              />
+            }
+          >
+            <Route path="/employee/dashboard" element={<EmployeeDashboardPage />} />
+            <Route
+              path="/employee/attendance"
+              element={<EmployeeOperationsPage activeSection="attendance" />}
+            />
+            <Route
+              path="/employee/leaves"
+              element={<EmployeeOperationsPage activeSection="leaves" />}
+            />
+            <Route
+              path="/employee/salary"
+              element={<EmployeeOperationsPage activeSection="salary" />}
+            />
+          </Route>
+        </Route>
+      </Route>
 
-                    {/* ── EMPLOYEE ROUTES ── */}
-                    <Route element={<RoleProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.STORE_ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE]} />}>
-                        <Route path="/employee/dashboard" element={<EmployeeDashboardPage />} />
-                        <Route path="/employee/attendance" element={<EmployeeOperationsPage activeSection="attendance" />} />
-                        <Route path="/employee/leaves" element={<EmployeeOperationsPage activeSection="leaves" />} />
-                        <Route path="/employee/salary" element={<EmployeeOperationsPage activeSection="salary" />} />
-                    </Route>
-
-                </Route>
-            </Route>
-
-            {/* ── 404 ── */}
-            <Route path="*" element={<NotFoundPage />} />
-        </Routes>
-    );
+      {/* ── 404 ── */}
+      <Route path="*" element={<NotFoundPage />} />
+    </Routes>
+  );
 }
