@@ -19,10 +19,8 @@ const Config = {
 
   // SMTP (optional)
   smtp_host: process.env.SMTP_HOST,
-  smtp_port: process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587,
   smtp_user: process.env.SMTP_USER,
   smtp_pass: process.env.SMTP_PASS,
-  smtp_secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465',
 
   frontend_url: process.env.FRONTEND_URL,
 };

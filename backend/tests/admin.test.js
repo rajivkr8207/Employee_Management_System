@@ -1,0 +1,128 @@
+import request from 'supertest';
+import { jest } from '@jest/globals';
+import { ROLES } from '../src/constants/roles.js';
+
+jest.unstable_mockModule('../src/config/redis.js', () => ({
+  default: {
+    get: async () => null,
+    set: async () => 'OK',
+    setex: async () => 'OK',
+    del: async () => 1,
+    on: () => {},
+    quit: async () => 'OK',
+  },
+}));
+
+const { app } = await import('../src/app.js');
+const { default: UserModel } = await import('../src/modules/user/user.model.js');
+const { organizationModel } = await import('../src/modules/organization/organization.model.js');
+const { StoreModel } = await import('../src/modules/store/store.model.js');
+const { EmployeeModel } = await import('../src/modules/employee/employee.model.js');
+const { connectTestDB, closeTestDB, clearTestDB } = await import('./setup.js');
+
+const createUser = async (username, role, properties = {}) =>
+  UserModel.create({
+    fullName: username,
+    username,
+    email: `${username}@example.com`,
+    password: 'Password123',
+    role,
+    isVerified: true,
+    ...properties,
+  });
+
+beforeAll(async () => {
+  await connectTestDB();
+});
+
+afterEach(async () => {
+  await clearTestDB();
+});
+
+afterAll(async () => {
+  await closeTestDB();
+});
+
+describe('Admin directory endpoints', () => {
+  it('returns all users, stores, employees, and live dashboard counts to an admin', async () => {
+    const admin = await createUser('systemadmin', ROLES.ADMIN);
+    const storeAdmin = await createUser('storeadmin', ROLES.STORE_ADMIN);
+    const manager = await createUser('manager', ROLES.MANAGER);
+    const employeeUser = await createUser('employee', ROLES.EMPLOYEE);
+    await createUser('pendinguser', ROLES.STORE_ADMIN, { isApproved: false });
+    const organization = await organizationModel.create({
+      name: 'Example Organization',
+      email: 'organization@example.com',
+      ownerId: storeAdmin._id,
+      verificationStatus: 'approved',
+    });
+    const store = await StoreModel.create({
+      organizationId: organization._id,
+      name: 'Example Store',
+      code: 'EXAMPLE-01',
+      location: { lat: 19, lng: 72 },
+      managerId: manager._id,
+      createdBy: storeAdmin._id,
+    });
+    await EmployeeModel.create([
+      {
+        organizationId: organization._id,
+        storeId: store._id,
+        userId: manager._id,
+        employeeCode: 'MGR-001',
+        designation: 'Store Manager',
+        salary: 0,
+      },
+      {
+        organizationId: organization._id,
+        storeId: store._id,
+        userId: employeeUser._id,
+        employeeCode: 'EMP-001',
+        designation: 'Cashier',
+        salary: 25000,
+      },
+    ]);
+    const token = admin.generateAccessToken();
+
+    const [usersResponse, storesResponse, employeesResponse, statsResponse] = await Promise.all([
+      request(app).get('/api/v1/admin/users').set('Cookie', `accessToken=${token}`),
+      request(app).get('/api/v1/admin/stores').set('Cookie', `accessToken=${token}`),
+      request(app).get('/api/v1/admin/employees').set('Cookie', `accessToken=${token}`),
+      request(app).get('/api/v1/admin/dashboard/stats').set('Cookie', `accessToken=${token}`),
+    ]);
+
+    expect(usersResponse.statusCode).toBe(200);
+    expect(usersResponse.body.data.users).toHaveLength(5);
+    expect(usersResponse.body.data.users[0]).not.toHaveProperty('password');
+    expect(storesResponse.statusCode).toBe(200);
+    expect(storesResponse.body.data.stores[0]).toMatchObject({
+      name: 'Example Store',
+      employeeCount: 2,
+      organizationId: { name: 'Example Organization' },
+      managerId: { fullName: 'manager' },
+    });
+    expect(employeesResponse.statusCode).toBe(200);
+    expect(employeesResponse.body.data.employees).toHaveLength(2);
+    expect(employeesResponse.body.data.employees[0]).not.toHaveProperty('salary');
+    expect(statsResponse.statusCode).toBe(200);
+    expect(statsResponse.body.data).toMatchObject({
+      users: { total: 5, pending: 1 },
+      stores: { total: 1, active: 1 },
+      employees: { total: 2, active: 2 },
+      managers: { total: 1, approved: 1 },
+    });
+  });
+
+  it('rejects unauthenticated and non-admin directory requests', async () => {
+    const storeAdmin = await createUser('restrictedadmin', ROLES.STORE_ADMIN);
+    const token = storeAdmin.generateAccessToken();
+
+    const unauthenticated = await request(app).get('/api/v1/admin/users');
+    const forbidden = await request(app)
+      .get('/api/v1/admin/users')
+      .set('Cookie', `accessToken=${token}`);
+
+    expect(unauthenticated.statusCode).toBe(401);
+    expect(forbidden.statusCode).toBe(403);
+  });
+});

@@ -9,8 +9,8 @@ export const getMailTransporter = () => {
   if (Config.smtp_host && Config.smtp_user && Config.smtp_pass) {
     cachedTransporter = nodemailer.createTransport({
       host: Config.smtp_host,
-      port: Number(Config.smtp_port) || 587,
-      secure: Config.smtp_secure,
+      port: 587,
+      secure: false,
       auth: {
         user: Config.smtp_user,
         pass: Config.smtp_pass,
