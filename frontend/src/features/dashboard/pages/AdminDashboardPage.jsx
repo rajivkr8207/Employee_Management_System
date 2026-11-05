@@ -116,6 +116,11 @@ export default function AdminDashboardPage() {
                             Verify Users ({s.users.pending})
                         </Button>
                     </Link>
+                    <Link to="/admin/store-verification">
+                        <Button variant="outline" size="sm" icon={Store}>
+                            Verify Stores ({s.stores.pending})
+                        </Button>
+                    </Link>
                     <Link to="/admin/stores">
                         <Button variant="primary" size="sm" icon={Store}>
                             View Stores ({s.stores.total})
@@ -214,13 +219,14 @@ export default function AdminDashboardPage() {
                         linkTo="/admin/stores"
                     />
                     <StatCard
-                        title="Inactive Stores"
-                        value={s.stores.inactive}
-                        sub="Not currently operational"
-                        icon={Store}
-                        iconBg="var(--danger-soft)"
-                        iconColor="var(--danger)"
-                        linkTo="/admin/stores"
+                        title="Pending Store Approval"
+                        value={s.stores.pending}
+                        sub="Awaiting administrator review"
+                        icon={Clock}
+                        iconBg="var(--warning-soft)"
+                        iconColor="var(--warning)"
+                        badge={s.stores.pending > 0 ? "Action Required" : null}
+                        linkTo="/admin/store-verification"
                     />
                     <StatCard
                         title="Total Employees"

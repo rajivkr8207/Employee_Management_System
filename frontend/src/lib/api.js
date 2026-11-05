@@ -1,18 +1,27 @@
 import axios from "axios";
 import { Config } from "../config/Config";
 
+const baseURL = `${Config.BACKEND_URL}/api/v1`;
+
 export const api = axios.create({
-    baseURL: `${Config.BACKEND_URL}/api/v1`,
+    baseURL,
     timeout: 10000,
     withCredentials: true,
     headers: { "Content-Type": "application/json" },
 });
 
-/* ── Request interceptor: attach stored token automatically ── */
+let authStore;
+let refreshPromise;
+
+export function bindAuthStore(store) {
+    authStore = store;
+}
+
 api.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem("ems_token");
-        if (token && token !== "undefined" && token !== "null") {
+        const token = authStore?.getState().auth.token;
+        if (token) {
+            config.headers = config.headers || {};
             config.headers.Authorization = `Bearer ${token}`;
         }
         return config;
@@ -20,18 +29,63 @@ api.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
-/* ── Response interceptor: handle 401 globally ── */
+function isAuthEndpoint(url = "") {
+    return [
+        "/auth/login",
+        "/auth/register",
+        "/auth/store-admin/register",
+        "/auth/refresh-token",
+    ].some((endpoint) => url.includes(endpoint));
+}
+
+function refreshAccessToken() {
+    if (!refreshPromise) {
+        refreshPromise = axios
+            .post(`${baseURL}/auth/refresh-token`, {}, {
+                timeout: 10000,
+                withCredentials: true,
+                headers: { "Content-Type": "application/json" },
+            })
+            .then(({ data }) => {
+                const token = data?.data?.accessToken;
+                if (!token) {
+                    throw new Error("The refresh response did not contain an access token");
+                }
+                authStore?.dispatch({ type: "auth/setAccessToken", payload: token });
+                return token;
+            })
+            .finally(() => {
+                refreshPromise = null;
+            });
+    }
+    return refreshPromise;
+}
+
 api.interceptors.response.use(
     (response) => response,
-    (error) => {
-        if (error.response?.status === 401) {
-            const currentPath = window.location.pathname;
-            if (currentPath !== "/login" && currentPath !== "/register") {
-                localStorage.removeItem("ems_token");
-                localStorage.removeItem("ems_user");
-                window.location.href = "/login";
-            }
+    async (error) => {
+        const request = error.config;
+        if (
+            error.response?.status !== 401 ||
+            !request ||
+            request._retry ||
+            isAuthEndpoint(request.url)
+        ) {
+            return Promise.reject(error);
         }
-        return Promise.reject(error);
+
+        request._retry = true;
+        try {
+            const token = await refreshAccessToken();
+            request.headers = request.headers || {};
+            request.headers.Authorization = `Bearer ${token}`;
+            return api(request);
+        } catch (refreshError) {
+            authStore?.dispatch({ type: "auth/clearAuth" });
+            if (window.location.pathname !== "/login") {
+                window.location.replace("/login");
+            }
+            return Promise.reject(refreshError);
+        }
     }
 );

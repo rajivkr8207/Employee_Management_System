@@ -34,17 +34,6 @@ export const rejectUserThunk = createAsyncThunk(
     }
 );
 
-export const requestUserInfoThunk = createAsyncThunk(
-    "userVerification/requestInfo",
-    async ({ userId, notes }, { rejectWithValue }) => {
-        try {
-            return await userVerificationService.requestAdditionalInfo(userId, notes);
-        } catch (err) {
-            return rejectWithValue(err.message || "Failed to request additional information");
-        }
-    }
-);
-
 const userVerificationSlice = createSlice({
     name: "userVerification",
     initialState: {
@@ -112,26 +101,9 @@ const userVerificationSlice = createSlice({
             .addCase(rejectUserThunk.rejected, (state, action) => {
                 state.actionLoading = false;
                 state.error = action.payload;
-            })
-            // Request info
-            .addCase(requestUserInfoThunk.pending, (state) => {
-                state.actionLoading = true;
-            })
-            .addCase(requestUserInfoThunk.fulfilled, (state, action) => {
-                state.actionLoading = false;
-                const updated = action.payload;
-                state.users = state.users.map((u) => (u.id === updated.id ? updated : u));
-                if (state.selectedUser?.id === updated.id) {
-                    state.selectedUser = updated;
-                }
-            })
-            .addCase(requestUserInfoThunk.rejected, (state, action) => {
-                state.actionLoading = false;
-                state.error = action.payload;
             });
     },
 });
 
 export const { setActiveTab, setSelectedUser, clearSelectedUser } = userVerificationSlice.actions;
 export default userVerificationSlice.reducer;
-

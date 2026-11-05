@@ -6,7 +6,11 @@ import { Provider } from "react-redux";
 import { BrowserRouter } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import { store } from "./store";
+import { bindAuthStore } from "../lib/api";
 import "react-toastify/dist/ReactToastify.css";
+
+bindAuthStore(store);
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <Provider store={store}>

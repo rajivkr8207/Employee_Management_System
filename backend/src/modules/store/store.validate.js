@@ -1,8 +1,8 @@
 import { body, param } from 'express-validator';
 import { validate } from '../../config/validate.js';
 
-const allowedStoreFields = ['name', 'code', 'address', 'location', 'managerId', 'status'];
-const allowedCreateFields = ['name', 'code', 'address', 'location', 'status'];
+const allowedStoreFields = ['name', 'code', 'address', 'location', 'managerId'];
+const allowedCreateFields = ['name', 'code', 'address', 'location'];
 const allowedAddressFields = ['street', 'city', 'state', 'pincode', 'country'];
 const allowedLocationFields = ['lat', 'lng', 'radius'];
 
@@ -53,10 +53,6 @@ const storeFieldsValidation = [
     .isFloat({ gt: 0 })
     .withMessage('Location radius must be greater than zero')
     .toFloat(),
-  body('status')
-    .optional()
-    .isIn(['active', 'inactive'])
-    .withMessage('Status must be active or inactive'),
 ];
 
 export const createStoreValidation = [
@@ -131,14 +127,16 @@ export const updateStoreValidation = [
     .optional({ nullable: true })
     .custom((value) => value === null || /^[a-f\d]{24}$/i.test(value))
     .withMessage('Manager ID must be a valid user ID or null'),
-  body('status')
-    .optional()
-    .isIn(['active', 'inactive'])
-    .withMessage('Status must be active or inactive'),
   validate,
 ];
 
 export const storeIdParamValidation = [storeIdValidation, validate];
+
+export const storeManagerParamValidation = [
+  storeIdValidation,
+  param('managerId').isMongoId().withMessage('A valid manager ID is required'),
+  validate,
+];
 
 export const createStoreManagerValidation = [
   storeIdValidation,
@@ -164,5 +162,21 @@ export const createStoreManagerValidation = [
     .withMessage('Please enter a valid mobile number'),
   body('designation').optional().trim(),
   body('salary').optional().isFloat({ min: 0 }),
+  validate,
+];
+
+export const updateStoreManagerValidation = [
+  storeManagerParamValidation,
+  body()
+    .custom(
+      (value) =>
+        value !== null &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        Object.keys(value).length === 1 &&
+        typeof value.isActive === 'boolean',
+    )
+    .withMessage('Provide isActive as a boolean'),
+  body('isActive').isBoolean().withMessage('isActive must be a boolean').toBoolean(),
   validate,
 ];

@@ -45,24 +45,12 @@ describe('Auth API', () => {
   };
 
   describe('POST /api/v1/auth/register', () => {
-    it('should register a new user successfully', async () => {
+    it('should reject direct registration without an invitation', async () => {
       const res = await request(app).post('/api/v1/auth/register').send(validUser);
 
-      expect(res.statusCode).toEqual(201);
-      expect(res.body.success).toBe(true);
-      expect(res.body.data.user.email).toBe(validUser.email);
-
-      // Check if user is actually created in DB
-      const user = await UserModel.findOne({ email: validUser.email });
-      expect(user).toBeTruthy();
-    });
-
-    it('should fail if email is already registered', async () => {
-      await request(app).post('/api/v1/auth/register').send(validUser);
-
-      const res = await request(app).post('/api/v1/auth/register').send(validUser);
-
-      expect(res.statusCode).toEqual(409);
+      expect(res.statusCode).toEqual(403);
+      expect(res.body.success).toBe(false);
+      expect(await UserModel.findOne({ email: validUser.email })).toBeNull();
     });
 
     it('should fail if required fields are missing', async () => {
@@ -76,11 +64,12 @@ describe('Auth API', () => {
 
   describe('POST /api/v1/auth/login', () => {
     beforeEach(async () => {
-      // Seed a user before testing login
-      await request(app).post('/api/v1/auth/register').send(validUser);
-      const user = await UserModel.findOne({ email: validUser.email });
-      user.isVerified = true;
-      await user.save();
+      await UserModel.create({
+        ...validUser,
+        role: 'employ',
+        isVerified: true,
+        isApproved: true,
+      });
     });
 
     it('should login successfully with correct credentials', async () => {

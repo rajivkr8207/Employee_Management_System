@@ -8,7 +8,7 @@ import { authorizeOrganizationAccess } from '../membership/membership.service.js
 import { EmployeeModel } from './employee.model.js';
 import crypto from 'crypto';
 
-const employeeUserFields = 'fullName username email mobile avatar';
+const employeeUserFields = 'fullName username email mobile avatar role';
 const populateEmployee = (query) =>
   query
     .populate('userId', employeeUserFields)
@@ -160,6 +160,7 @@ export const createEmployee = async (employeeData, requesterId) => {
       employeeCode,
       designation: employeeData.designation || (role === 'manager' ? 'Store Manager' : 'Employee'),
       salary: employeeData.salary || 0,
+      Dob: employeeData.Dob,
       joiningDate: employeeData.joiningDate,
       status: employeeData.status || 'active',
     });
@@ -220,4 +221,10 @@ export const getEmployee = async ({ userId, organizationId, employeeId }) => {
     storeId: employee.storeId,
   });
   return populateEmployee(EmployeeModel.findById(employeeId));
+};
+
+export const getMyEmployee = async (userId) => {
+  const employee = await EmployeeModel.findOne({ userId });
+  if (!employee) throw new ApiError(404, 'Your employee profile was not found');
+  return populateEmployee(EmployeeModel.findById(employee._id));
 };

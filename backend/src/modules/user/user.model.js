@@ -100,6 +100,17 @@ const userSchema = new mongoose.Schema(
       default: true,
       index: true,
     },
+    approvalStatus: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: null,
+      index: true,
+    },
+    rejectionReason: {
+      type: String,
+      trim: true,
+      default: null,
+    },
     isBlocked: {
       type: Boolean,
       default: false,

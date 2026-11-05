@@ -64,7 +64,11 @@ export default function AllStoresPage() {
             ) : storesError ? null : filteredStores.length ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filteredStores.map((store) => {
-                        const status = formatStatus(store.status);
+                        const status = formatStatus(
+                            store.verificationStatus === "pending"
+                                ? "pending"
+                                : store.verificationStatus || store.status
+                        );
                         return (
                             <Card key={store._id} padding="md" className="space-y-3">
                                 <div className="flex items-start justify-between gap-3">

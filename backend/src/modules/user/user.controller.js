@@ -15,6 +15,7 @@ import {
   registerStoreAdmin,
   listPendingStoreAdmins,
   approveStoreAdmin,
+  rejectStoreAdmin,
 } from './user.service.js';
 
 const cookieOptions = {
@@ -94,6 +95,13 @@ export const approveStoreAdminAccount = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(new ApiResponse(200, result, 'Store administrator approved successfully'));
+});
+
+export const rejectStoreAdminAccount = asyncHandler(async (req, res) => {
+  const result = await rejectStoreAdmin(req.params.userId, req.body.reason);
+  return res
+    .status(200)
+    .json(new ApiResponse(200, result, 'Store administrator rejected successfully'));
 });
 // ─────────────────────────────────────────────
 // POST /api/v1/auth/login

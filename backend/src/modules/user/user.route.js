@@ -14,10 +14,12 @@ import {
   registerInvitedStoreAdmin,
   getPendingStoreAdmins,
   approveStoreAdminAccount,
+  rejectStoreAdminAccount,
 } from './user.controller.js';
 import { verifyAdmin, verifyJWT } from '../../middlewares/auth.middleware.js';
 import {
   loginValidation,
+  registerValidation,
   editProfileValidation,
   changePasswordValidation,
   verifyOtpValidation,
@@ -26,6 +28,7 @@ import {
   storeAdminApprovalValidation,
   invitedStoreAdminRegisterValidation,
   verifyStoreAdminInvitationValidation,
+  storeAdminRejectionValidation,
 } from './user.validate.js';
 
 const authRouter = Router();
@@ -39,7 +42,7 @@ const authRouter = Router();
  * @desc    Register an employee account and send an email OTP
  * @access  Public
  */
-authRouter.post('/register', register);
+authRouter.post('/register', registerValidation, register);
 
 /**
  * @route   POST /api/v1/auth/verify-otp
@@ -127,6 +130,13 @@ authRouter.patch(
   verifyAdmin,
   storeAdminApprovalValidation,
   approveStoreAdminAccount,
+);
+authRouter.patch(
+  '/store-admin/:userId/reject',
+  verifyJWT,
+  verifyAdmin,
+  storeAdminRejectionValidation,
+  rejectStoreAdminAccount,
 );
 
 export default authRouter;

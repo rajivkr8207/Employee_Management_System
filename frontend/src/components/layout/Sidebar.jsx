@@ -237,7 +237,7 @@ export default function Sidebar() {
                         {initials}
                     </div>
                     <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white leading-none mb-1 truncate">
+                        <p className="text-sm font-medium text-[var(--text-primary)] leading-none mb-1 truncate">
                             {user?.fullName || user?.name || "User"}
                         </p>
                         <p className="text-[11px] text-[var(--sidebar-text-muted)] leading-none truncate capitalize">

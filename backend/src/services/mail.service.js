@@ -18,7 +18,6 @@ export class MailService {
           text,
           html: html || `<p>${text}</p>`,
         });
-        console.log(`[MailService] Email sent to ${to}: ${info.messageId}`);
         return { success: true, messageId: info.messageId, simulated: false };
       } catch (error) {
         console.error(`[MailService Error] Failed to send email to ${to}:`, error.message);
@@ -34,17 +33,6 @@ export class MailService {
     // Fallback development mode: Log email content to console so admin/dev can click links
     this.logSimulatedMail({ to, subject, text });
     return { success: true, simulated: true };
-  }
-
-  logSimulatedMail({ to, subject, text }) {
-    console.log('\n======================================================');
-    console.log('   [MAIL SERVICE (DEVELOPMENT / SIMULATED DISPATCH)]   ');
-    console.log('======================================================');
-    console.log(`To:      ${to}`);
-    console.log(`Subject: ${subject}`);
-    console.log('------------------------------------------------------');
-    console.log(text);
-    console.log('======================================================\n');
   }
 
   SendRegisterMail(email, otp, fullName) {

@@ -2,15 +2,17 @@ import { ROLES } from '../../constants/roles.js';
 import User from '../user/user.model.js';
 import { StoreModel } from '../store/store.model.js';
 import { EmployeeModel } from '../employee/employee.model.js';
+import { ApiError } from '../../utils/ApiError.js';
 
 const userFields =
-  'fullName username email mobile avatar role isVerified isApproved isActive isBlocked createdAt';
+  'fullName username email mobile avatar role isVerified isApproved approvalStatus rejectionReason isActive isBlocked createdAt';
 
 const getUserStatus = (user) => {
   if (user.isBlocked) return 'blocked';
+  if (user.approvalStatus === 'rejected') return 'rejected';
+  if (!user.isApproved) return 'pending';
   if (!user.isActive) return 'inactive';
   if (!user.isVerified) return 'unverified';
-  if (!user.isApproved) return 'pending';
   return 'active';
 };
 
@@ -39,6 +41,48 @@ export const listAdminStores = async () => {
   }));
 };
 
+export const listStoreVerifications = async () =>
+  StoreModel.find()
+    .populate('organizationId', 'name')
+    .populate('createdBy', 'fullName username email mobile')
+    .sort({ createdAt: -1 })
+    .lean()
+    .then((stores) =>
+      stores.map((store) => ({
+        ...store,
+        verificationStatus:
+          store.verificationStatus || (store.status === 'active' ? 'approved' : 'pending'),
+      })),
+    );
+
+export const reviewStoreVerification = async (storeId, status, adminId, reason = null) => {
+  const store = await StoreModel.findOneAndUpdate(
+    {
+      _id: storeId,
+      $or: [
+        { verificationStatus: 'pending' },
+        { verificationStatus: { $exists: false }, status: 'inactive' },
+      ],
+    },
+    {
+      $set: {
+        verificationStatus: status,
+        status: status === 'approved' ? 'active' : 'inactive',
+        rejectionReason: reason,
+        reviewedBy: adminId,
+        reviewedAt: new Date(),
+      },
+    },
+    { new: true, runValidators: true },
+  )
+    .populate('organizationId', 'name')
+    .populate('createdBy', 'fullName username email mobile');
+  if (!store) {
+    throw new ApiError(404, 'Pending store was not found');
+  }
+  return store;
+};
+
 export const listAdminEmployees = () =>
   EmployeeModel.find()
     .select('organizationId storeId userId employeeCode designation status createdAt')
@@ -58,6 +102,8 @@ export const getAdminDashboardStats = async () => {
     totalStores,
     activeStores,
     inactiveStores,
+    pendingStores,
+    rejectedStores,
     totalEmployees,
     activeEmployees,
     inactiveEmployees,
@@ -68,12 +114,24 @@ export const getAdminDashboardStats = async () => {
   ] = await Promise.all([
     User.countDocuments(),
     User.countDocuments({ isVerified: true }),
-    User.countDocuments({ isApproved: false }),
+    User.countDocuments({
+      $or: [
+        { approvalStatus: 'pending' },
+        { approvalStatus: null, isApproved: false },
+      ],
+    }),
     User.countDocuments({ isBlocked: true }),
     User.countDocuments({ isActive: true, isBlocked: false }),
     StoreModel.countDocuments(),
     StoreModel.countDocuments({ status: 'active' }),
     StoreModel.countDocuments({ status: 'inactive' }),
+    StoreModel.countDocuments({
+      $or: [
+        { verificationStatus: 'pending' },
+        { verificationStatus: { $exists: false }, status: 'inactive' },
+      ],
+    }),
+    StoreModel.countDocuments({ verificationStatus: 'rejected' }),
     EmployeeModel.countDocuments(),
     EmployeeModel.countDocuments({ status: 'active' }),
     EmployeeModel.countDocuments({ status: { $ne: 'active' } }),
@@ -86,7 +144,7 @@ export const getAdminDashboardStats = async () => {
     }),
     User.countDocuments({ role: ROLES.MANAGER, isApproved: false }),
     User.find()
-      .select('fullName role isVerified isApproved isActive isBlocked createdAt')
+      .select('fullName role isVerified isApproved approvalStatus isActive isBlocked createdAt')
       .sort({ createdAt: -1 })
       .limit(5)
       .lean(),
@@ -104,6 +162,8 @@ export const getAdminDashboardStats = async () => {
       total: totalStores,
       active: activeStores,
       inactive: inactiveStores,
+      pending: pendingStores,
+      rejected: rejectedStores,
     },
     employees: {
       total: totalEmployees,

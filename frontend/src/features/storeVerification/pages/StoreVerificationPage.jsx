@@ -8,20 +8,16 @@ import {
     Eye,
     Check,
     X,
-    FileText,
     Mail,
     Phone,
     MapPin,
     User,
-    ExternalLink,
-    FileCheck,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import {
     fetchStoresThunk,
     approveStoreThunk,
     rejectStoreThunk,
-    requestStoreDocsThunk,
     setActiveTab,
     setSelectedStore,
     clearSelectedStore,
@@ -36,7 +32,7 @@ import ConfirmDialog from "../../../components/Common/ConfirmDialog";
 
 export default function StoreVerificationPage() {
     const dispatch = useDispatch();
-    const { stores, activeTab, loading, actionLoading, selectedStore } = useSelector(
+    const { stores, activeTab, loading, actionLoading, selectedStore, error } = useSelector(
         (state) => state.storeVerification
     );
 
@@ -46,7 +42,7 @@ export default function StoreVerificationPage() {
 
     const [confirmModal, setConfirmModal] = useState({
         isOpen: false,
-        type: null, // "approve" | "reject" | "docs"
+        type: null,
         store: null,
     });
 
@@ -71,7 +67,6 @@ export default function StoreVerificationPage() {
                 !q ||
                 s.name?.toLowerCase().includes(q) ||
                 s.code?.toLowerCase().includes(q) ||
-                s.gstNumber?.toLowerCase().includes(q) ||
                 s.address?.city?.toLowerCase().includes(q) ||
                 s.owner?.name?.toLowerCase().includes(q);
             return matchesTab && matchesSearch;
@@ -105,17 +100,6 @@ export default function StoreVerificationPage() {
         setConfirmModal({ isOpen: false, type: null, store: null });
     };
 
-    const handleRequestDocsConfirm = async (notes) => {
-        if (!confirmModal.store) return;
-        const res = await dispatch(requestStoreDocsThunk({ storeId: confirmModal.store.id, notes }));
-        if (!res.error) {
-            toast.success(`Document request sent to ${confirmModal.store.name}.`);
-        } else {
-            toast.error(res.payload || "Failed to send request");
-        }
-        setConfirmModal({ isOpen: false, type: null, store: null });
-    };
-
     const tabs = [
         { id: "all", label: "All Stores", count: counts.all, icon: Store },
         { id: "pending", label: "Pending Approval", count: counts.pending, icon: Clock },
@@ -132,10 +116,19 @@ export default function StoreVerificationPage() {
                         Store Registration & Verification
                     </h1>
                     <p className="text-sm text-[var(--text-secondary)] mt-0.5">
-                        Validate commercial licenses, GST registration, and approve enterprise retail branches
+                        Review store details submitted by store administrators and approve or reject registrations
                     </p>
                 </div>
             </div>
+
+            {error && (
+                <div role="alert" className="flex items-center justify-between gap-4 rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-[var(--text-primary)]">
+                    <span>{error}</span>
+                    <Button variant="outline" size="sm" onClick={() => dispatch(fetchStoresThunk("all"))}>
+                        Retry
+                    </Button>
+                </div>
+            )}
 
             {/* ── Tabs & Search Bar ── */}
             <Card padding="sm" className="space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-4">
@@ -182,7 +175,7 @@ export default function StoreVerificationPage() {
                             setPage(1);
                         }}
                         onClear={() => setSearchQuery("")}
-                        placeholder="Search store name, code, GST..."
+                        placeholder="Search store, code, city, or owner..."
                     />
                 </div>
             </Card>
@@ -194,7 +187,7 @@ export default function StoreVerificationPage() {
                         <thead>
                             <tr className="border-b border-[var(--border)] bg-[var(--surface-secondary)] text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
                                 <th className="px-4 py-3.5">Store Details</th>
-                                <th className="px-4 py-3.5">Registration & GST</th>
+                                <th className="px-4 py-3.5">Organization</th>
                                 <th className="px-4 py-3.5">Location</th>
                                 <th className="px-4 py-3.5">Store Owner</th>
                                 <th className="px-4 py-3.5">Status</th>
@@ -241,13 +234,13 @@ export default function StoreVerificationPage() {
                                                 </div>
                                             </td>
 
-                                            {/* Reg & GST */}
+                                            {/* Organization */}
                                             <td className="px-4 py-3.5">
                                                 <p className="text-xs font-medium text-[var(--text-primary)]">
-                                                    GST: <strong className="font-mono text-[var(--text-secondary)]">{s.gstNumber}</strong>
+                                                    {s.organizationId?.name || "—"}
                                                 </p>
-                                                <p className="text-xs text-[var(--text-muted)] font-mono mt-0.5">
-                                                    {s.registrationNumber}
+                                                <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                                                    Submitted {new Date(s.registrationDate).toLocaleDateString()}
                                                 </p>
                                             </td>
 
@@ -312,14 +305,6 @@ export default function StoreVerificationPage() {
                                                                 <X size={16} />
                                                             </button>
 
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setConfirmModal({ isOpen: true, type: "docs", store: s })}
-                                                                className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-500/10 transition-colors"
-                                                                title="Request Additional Documents"
-                                                            >
-                                                                <FileCheck size={16} />
-                                                            </button>
                                                         </>
                                                     )}
                                                 </div>
@@ -396,7 +381,7 @@ export default function StoreVerificationPage() {
                                 <div>
                                     <h3 className="text-lg font-bold text-[var(--text-primary)]">{selectedStore.name}</h3>
                                     <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-mono">
-                                        Code: {selectedStore.code} • Reg No: {selectedStore.registrationNumber}
+                                        Code: {selectedStore.code}
                                     </p>
                                 </div>
                                 <Badge variant={selectedStore.status === "approved" ? "success" : selectedStore.status === "rejected" ? "danger" : "warning"}>
@@ -435,43 +420,10 @@ export default function StoreVerificationPage() {
                             </div>
                         </div>
 
-                        {/* Store Registration Documents */}
                         <div>
-                            <p className="text-xs font-bold uppercase text-[var(--text-muted)] mb-3">
-                                Compliance & Legal Documents
+                            <p className="text-xs text-[var(--text-muted)]">
+                                No verification documents were submitted with this store registration.
                             </p>
-                            <div className="space-y-2">
-                                {selectedStore.documents?.map((doc, dIdx) => (
-                                    <div
-                                        key={dIdx}
-                                        className="p-3 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] flex items-center justify-between"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-lg bg-[var(--surface-secondary)] text-[var(--primary)] flex items-center justify-center">
-                                                <FileText size={16} />
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-semibold text-[var(--text-primary)]">{doc.type}</p>
-                                                <p className="text-xs text-[var(--text-muted)]">{doc.name}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            {doc.verified ? (
-                                                <Badge variant="success">Verified</Badge>
-                                            ) : (
-                                                <Badge variant="warning">Unchecked</Badge>
-                                            )}
-                                            <button
-                                                type="button"
-                                                onClick={() => toast.info(`Opening ${doc.name}`)}
-                                                className="text-xs font-semibold text-[var(--primary)] hover:underline flex items-center gap-1 ml-2"
-                                            >
-                                                Inspect <ExternalLink size={11} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
                         </div>
 
                         {selectedStore.rejectionReason && (
@@ -511,20 +463,6 @@ export default function StoreVerificationPage() {
                 loading={actionLoading}
             />
 
-            {/* ── Request Docs Dialog ── */}
-            <ConfirmDialog
-                isOpen={confirmModal.isOpen && confirmModal.type === "docs"}
-                onClose={() => setConfirmModal({ isOpen: false, type: null, store: null })}
-                onConfirm={handleRequestDocsConfirm}
-                title="Request Additional Store Documents"
-                message={`Specify which legal or municipal documents need to be re-uploaded by ${confirmModal.store?.owner?.name}.`}
-                confirmLabel="Request Documents"
-                variant="info"
-                requireReason={true}
-                reasonLabel="Required Documents List"
-                reasonPlaceholder="e.g. Please provide the latest 2026 Commercial Electricity Bill and NOC..."
-                loading={actionLoading}
-            />
         </div>
     );
 }

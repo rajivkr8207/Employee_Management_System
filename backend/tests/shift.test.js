@@ -147,6 +147,7 @@ describe('Shift API', () => {
 
   it('limits managers to assigned stores and blocks unauthenticated requests', async () => {
     const { user: owner } = await createUser('shiftscopeowner');
+    const { user: otherOwner } = await createUser('shiftscopeotherowner');
     const { user: scopedManager, token: managerToken } = await createUser(
       'shiftscopemanager',
       ROLES.EMPLOYEE,
@@ -161,7 +162,7 @@ describe('Shift API', () => {
       name: 'Other Store',
       code: 'SHIFT-DENIED',
       location: { lat: 19, lng: 72 },
-      createdBy: owner.id,
+      createdBy: otherOwner.id,
     });
     await MembershipModel.create({
       userId: scopedManager.id,

@@ -126,7 +126,7 @@ export default function AccountStatusPage() {
                                 variant="outline"
                                 icon={RefreshCw}
                                 loading={profileLoading}
-                                onClick={() => fetchProfile()}
+                                onClick={() => fetchProfile({ force: true })}
                                 className="w-full sm:w-auto"
                             >
                                 Check Verification Status
@@ -147,4 +147,3 @@ export default function AccountStatusPage() {
         </div>
     );
 }
-

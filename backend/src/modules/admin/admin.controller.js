@@ -4,7 +4,9 @@ import {
   getAdminDashboardStats,
   listAdminEmployees,
   listAdminStores,
+  listStoreVerifications,
   listAdminUsers,
+  reviewStoreVerification,
 } from './admin.service.js';
 
 export const getDashboardStats = asyncHandler(async (_req, res) => {
@@ -27,4 +29,26 @@ export const getEmployees = asyncHandler(async (_req, res) => {
   return res
     .status(200)
     .json(new ApiResponse(200, { employees }, 'Employees fetched successfully'));
+});
+
+export const getStoreVerifications = asyncHandler(async (_req, res) => {
+  const stores = await listStoreVerifications();
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { stores }, 'Store verifications fetched successfully'));
+});
+
+export const approveStore = asyncHandler(async (req, res) => {
+  const store = await reviewStoreVerification(req.params.storeId, 'approved', req.user.id);
+  return res.status(200).json(new ApiResponse(200, { store }, 'Store approved and activated'));
+});
+
+export const rejectStore = asyncHandler(async (req, res) => {
+  const store = await reviewStoreVerification(
+    req.params.storeId,
+    'rejected',
+    req.user.id,
+    req.body.reason,
+  );
+  return res.status(200).json(new ApiResponse(200, { store }, 'Store application rejected'));
 });

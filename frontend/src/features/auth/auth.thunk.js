@@ -48,6 +48,13 @@ export const fetchProfileThunk = createAsyncThunk(
         } catch (err) {
             return rejectWithValue(extractError(err));
         }
+    },
+    {
+        condition: (options, { getState }) => {
+            const { profileStatus } = getState().auth;
+            return profileStatus !== "loading" &&
+                (options?.force || profileStatus !== "succeeded");
+        },
     }
 );
 
@@ -80,4 +87,3 @@ export const logoutThunk = createAsyncThunk(
         }
     }
 );
-

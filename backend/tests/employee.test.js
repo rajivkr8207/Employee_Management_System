@@ -61,6 +61,7 @@ const employeeDetails = (organizationId, storeId) => ({
   employeeCode: 'EMP-001',
   designation: 'Cashier',
   salary: 25000,
+  Dob: '1997-08-15',
   joiningDate: '2026-01-15',
 });
 
@@ -77,6 +78,83 @@ afterAll(async () => {
 });
 
 describe('Employee and membership flow', () => {
+  it('allows a manager to onboard employees only in assigned stores', async () => {
+    const { user: owner } = await createUser('manageremployeeowner');
+    const { organization, stores } = await createOrganizationAndStores(owner.id);
+    const { user: manager, token } = await createUser('manageremployee', ROLES.MANAGER);
+    stores[0].managerId = manager.id;
+    await stores[0].save();
+    await MembershipModel.create({
+      userId: manager.id,
+      organizationId: organization.id,
+      storeIds: [stores[0].id],
+      role: 'manager',
+      status: 'active',
+    });
+
+    const allowed = await request(app)
+      .post('/api/v1/employees')
+      .set('Cookie', `accessToken=${token}`)
+      .send({
+        ...employeeDetails(organization.id, stores[0].id),
+        user: {
+          fullName: 'Manager Added Employee',
+          username: 'manageraddedemployee',
+          email: 'manageraddedemployee@example.com',
+          password: 'Password123',
+        },
+      });
+    expect(allowed.statusCode).toBe(201);
+    expect(allowed.body.data.employee.userId.username).toBe('manageraddedemployee');
+
+    const forbidden = await request(app)
+      .post('/api/v1/employees')
+      .set('Cookie', `accessToken=${token}`)
+      .send({
+        ...employeeDetails(organization.id, stores[1].id),
+        employeeCode: 'EMP-OTHER-STORE',
+        user: {
+          fullName: 'Unassigned Store Employee',
+          username: 'unassignedemployee',
+          email: 'unassignedemployee@example.com',
+          password: 'Password123',
+        },
+      });
+    expect(forbidden.statusCode).toBe(403);
+  });
+
+  it('lets an onboarded employee log in and retrieve their own profile', async () => {
+    const { user: owner, token } = await createUser('employeeprofileowner');
+    const { organization, stores } = await createOrganizationAndStores(owner.id);
+    const created = await request(app)
+      .post('/api/v1/employees')
+      .set('Cookie', `accessToken=${token}`)
+      .send({
+        ...employeeDetails(organization.id, stores[0].id),
+        user: {
+          fullName: 'Employee Login',
+          username: 'employeelogin',
+          email: 'employeelogin@example.com',
+          password: 'Password123',
+        },
+      });
+
+    expect(created.statusCode).toBe(201);
+
+    const login = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ identifier: 'employeelogin', password: 'Password123' });
+    expect(login.statusCode).toBe(200);
+
+    const profile = await request(app)
+      .get('/api/v1/employees/me')
+      .set('Cookie', login.headers['set-cookie']);
+    expect(profile.statusCode).toBe(200);
+    expect(profile.body.data.employee.userId.username).toBe('employeelogin');
+    expect(profile.body.data.employee.employeeCode).toBe('EMP-001');
+    expect(profile.body.data.employee.storeId.name).toBe(stores[0].name);
+  });
+
   it('creates a user, membership, and employee and returns populated user details', async () => {
     const { user: owner, token } = await createUser('staffflowowner');
     const { organization, stores } = await createOrganizationAndStores(owner.id);
@@ -98,6 +176,7 @@ describe('Employee and membership flow', () => {
     expect(response.statusCode).toBe(201);
     expect(response.body.data.employee.userId.email).toBe('newstaff@example.com');
     expect(response.body.data.employee.storeId._id).toBe(stores[0].id);
+    expect(new Date(response.body.data.employee.Dob).toISOString()).toContain('1997-08-15');
     expect(await EmployeeModel.countDocuments({ organizationId: organization.id })).toBe(1);
 
     const createdUser = await UserModel.findOne({ email: 'newstaff@example.com' });

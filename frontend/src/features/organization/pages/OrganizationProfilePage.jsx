@@ -254,6 +254,7 @@ export default function OrganizationProfilePage() {
   const { user } = useSelector((state) => state.auth);
   const { stores } = useSelector((state) => state.store || { stores: [] });
   const { employees } = useSelector((state) => state.employees || { employees: [] });
+  const storeOrganizationId = stores[0]?.organizationId?._id || stores[0]?.organizationId;
 
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -261,8 +262,13 @@ export default function OrganizationProfilePage() {
   useEffect(() => {
     dispatch(fetchMyOrganization());
     dispatch(fetchMyStores());
-    dispatch(fetchEmployees());
   }, [dispatch]);
+
+  useEffect(() => {
+    if (storeOrganizationId) {
+      dispatch(fetchEmployees({ organizationId: storeOrganizationId }));
+    }
+  }, [dispatch, storeOrganizationId]);
 
   const handleSave = async (data) => {
     if (isEditing) {

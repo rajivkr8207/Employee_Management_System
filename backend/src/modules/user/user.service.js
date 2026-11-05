@@ -127,6 +127,7 @@ export const registerStoreAdmin = async ({
     provider: 'local',
     isVerified: true,
     isApproved: false,
+    approvalStatus: 'pending',
     isActive: true,
   });
 
@@ -139,14 +140,24 @@ export const registerStoreAdmin = async ({
 };
 
 export const listPendingStoreAdmins = async () =>
-  User.find({ role: ROLES.STORE_ADMIN, isApproved: false }).select(
-    'fullName username email mobile createdAt',
-  );
+  User.find({
+    role: ROLES.STORE_ADMIN,
+    isApproved: false,
+    isActive: true,
+    $or: [{ approvalStatus: 'pending' }, { approvalStatus: null }],
+  }).select('fullName username email mobile approvalStatus createdAt');
 
 export const approveStoreAdmin = async (id) => {
   const user = await User.findOneAndUpdate(
     { _id: id, role: ROLES.STORE_ADMIN, isApproved: false },
-    { $set: { isApproved: true } },
+    {
+      $set: {
+        isApproved: true,
+        isActive: true,
+        approvalStatus: 'approved',
+        rejectionReason: null,
+      },
+    },
     { new: true, runValidators: true },
   );
   if (!user) {
@@ -159,6 +170,25 @@ export const approveStoreAdmin = async (id) => {
     console.error('[Approval Mail Error]:', err.message);
   }
 
+  return { user };
+};
+
+export const rejectStoreAdmin = async (id, reason) => {
+  const user = await User.findOneAndUpdate(
+    { _id: id, role: ROLES.STORE_ADMIN, isApproved: false },
+    {
+      $set: {
+        isApproved: false,
+        isActive: false,
+        approvalStatus: 'rejected',
+        rejectionReason: reason,
+      },
+    },
+    { new: true, runValidators: true },
+  );
+  if (!user) {
+    throw new ApiError(404, 'Pending store administrator was not found');
+  }
   return { user };
 };
 

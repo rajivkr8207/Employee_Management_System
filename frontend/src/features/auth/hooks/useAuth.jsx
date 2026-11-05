@@ -57,7 +57,7 @@ export default function useAuth() {
 
     /* ── Fetch Profile ── */
     const fetchProfile = useCallback(
-        () => dispatch(fetchProfileThunk()),
+        (options) => dispatch(fetchProfileThunk(options)),
         [dispatch]
     );
 
