@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Plus, Users, Search, Trash2, Eye, Edit } from "lucide-react";
+import { Plus, Users, Search, Trash2, Eye } from "lucide-react";
 import { toast } from "react-toastify";
 import { fetchEmployees, createEmployee, deleteEmployee } from "../employeeSlice";
 import { fetchMyStores } from "../../store/storeSlice";
@@ -15,6 +15,7 @@ const statusBadge = {
   active: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   inactive: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
   blocked: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  terminated: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 };
 
 function AddEmployeeModal({ open, onClose, onSubmit, loading, stores, canAddManager }) {
@@ -269,6 +270,7 @@ export default function EmployeeListPage() {
   const [roleFilter, setRoleFilter] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [viewTarget, setViewTarget] = useState(null);
   const organizationId = stores[0]?.organizationId?._id || stores[0]?.organizationId;
 
   useEffect(() => {
@@ -304,9 +306,8 @@ export default function EmployeeListPage() {
   };
   const getStatus = (emp) => {
     const user = getEmployeeUser(emp);
-    return user.isActive === false || emp.status === "inactive" || emp.status === "terminated"
-      ? "inactive"
-      : "active";
+    if (user.isActive === false) return "inactive";
+    return ["active", "inactive", "terminated"].includes(emp.status) ? emp.status : "active";
   };
 
   const filtered = employees.filter((e) => {
@@ -499,17 +500,11 @@ export default function EmployeeListPage() {
                       <div className="flex items-center justify-end gap-2">
                         <button
                           type="button"
-                          onClick={() => toast.info(`Viewing details for ${getName(emp)}`)}
+                          onClick={() => setViewTarget(emp)}
                           className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded transition-colors"
+                          aria-label={`View details for ${getName(emp)}`}
                         >
                           <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => toast.info(`Editing ${getName(emp)}`)}
-                          className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded transition-colors"
-                        >
-                          <Edit className="w-4 h-4" />
                         </button>
                         <button
                           type="button"
@@ -536,6 +531,59 @@ export default function EmployeeListPage() {
         stores={stores}
         canAddManager={canAddManager}
       />
+
+      {viewTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setViewTarget(null);
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="employee-details-title"
+            className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900"
+          >
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h2 id="employee-details-title" className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {getName(viewTarget)}
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {viewTarget.designation || "Employee"} · {viewTarget.employeeCode || "No employee code"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewTarget(null)}
+                className="text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                aria-label="Close employee details"
+              >
+                &times;
+              </button>
+            </div>
+            <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+              {[
+                ["Email", getEmail(viewTarget)],
+                ["Mobile", getMobile(viewTarget)],
+                ["Role", getRole(viewTarget) === "employ" ? "Employee" : getRole(viewTarget)],
+                ["Status", getStatus(viewTarget)],
+                ["Date of birth", viewTarget.Dob || viewTarget.dob ? new Date(viewTarget.Dob || viewTarget.dob).toLocaleDateString() : "Not provided"],
+                ["Joining date", viewTarget.joiningDate ? new Date(viewTarget.joiningDate).toLocaleDateString() : "Not provided"],
+                ["Store", viewTarget.storeId?.name || "Not assigned"],
+                ["Salary", viewTarget.salary == null ? "Not provided" : new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(viewTarget.salary)],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</dt>
+                  <dd className="mt-1 break-words text-sm text-gray-900 dark:text-white">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        </div>
+      )}
 
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">

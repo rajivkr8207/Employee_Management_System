@@ -26,6 +26,7 @@ import EmployeeDashboardPage from "../features/dashboard/pages/EmployeeDashboard
 import StoreAdminOperationsPage from "../features/dashboard/pages/StoreAdminOperationsPage";
 import StoreManagerOperationsPage from "../features/dashboard/pages/StoreManagerOperationsPage";
 import EmployeeOperationsPage from "../features/dashboard/pages/EmployeeOperationsPage";
+import ShiftSchedulePage from "../features/shift/pages/ShiftSchedulePage";
 
 // Dedicated Feature Pages
 import StoreListPage from "../features/store/pages/StoreListPage";
@@ -110,6 +111,7 @@ export default function AppRoutes() {
               element={<StoreAdminOperationsPage activeSection="managers" />}
             />
             <Route path="/store-admin/employees" element={<EmployeeListPage />} />
+            <Route path="/store-admin/shifts" element={<ShiftSchedulePage />} />
             <Route
               path="/store-admin/attendance"
               element={<StoreAdminOperationsPage activeSection="attendance" />}
@@ -138,7 +140,7 @@ export default function AppRoutes() {
             />
             <Route
               path="/store-manager/shifts"
-              element={<StoreManagerOperationsPage activeSection="shifts" />}
+              element={<ShiftSchedulePage />}
             />
           </Route>
 

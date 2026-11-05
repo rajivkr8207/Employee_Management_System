@@ -44,6 +44,49 @@ export const createShiftValidation = [
 
 export const listShiftsValidation = [organizationQueryValidation, storeQueryValidation, validate];
 
+export const listAssignmentsValidation = [
+  organizationQueryValidation,
+  storeQueryValidation,
+  query('date')
+    .optional()
+    .matches(/^\d{4}-\d{2}-\d{2}$/)
+    .withMessage('Schedule date must use YYYY-MM-DD format')
+    .bail()
+    .isISO8601({ strict: true, strictSeparator: true })
+    .withMessage('Schedule date must be a valid calendar date'),
+  validate,
+];
+
+export const createAssignmentValidation = [
+  body()
+    .custom(
+      (value) =>
+        isObject(value) &&
+        Object.keys(value).length === 5 &&
+        ['organizationId', 'storeId', 'employeeId', 'shiftId', 'date'].every((key) =>
+          Object.hasOwn(value, key),
+        ),
+    )
+    .withMessage('Organization, store, employee, shift, and date are required'),
+  body('organizationId').isMongoId().withMessage('A valid organization ID is required'),
+  body('storeId').isMongoId().withMessage('A valid store ID is required'),
+  body('employeeId').isMongoId().withMessage('A valid employee ID is required'),
+  body('shiftId').isMongoId().withMessage('A valid shift ID is required'),
+  body('date')
+    .matches(/^\d{4}-\d{2}-\d{2}$/)
+    .withMessage('Schedule date must use YYYY-MM-DD format')
+    .bail()
+    .isISO8601({ strict: true, strictSeparator: true })
+    .withMessage('Schedule date must be a valid calendar date'),
+  validate,
+];
+
+export const shiftAssignmentIdValidation = [
+  param('assignmentId').isMongoId().withMessage('A valid shift assignment ID is required'),
+  organizationQueryValidation,
+  validate,
+];
+
 export const getShiftValidation = [shiftIdValidation, organizationQueryValidation, validate];
 
 export const updateShiftValidation = [

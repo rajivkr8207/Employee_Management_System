@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { Building2, Mail, MapPin, Store, Users, UserRound } from "lucide-react";
+import { Building2, Clock3, Mail, MapPin, Store, Users, UserRound } from "lucide-react";
 import Card from "../../../components/ui/Card";
 import Badge from "../../../components/ui/Badge";
 import Button from "../../../components/ui/Button";
@@ -108,6 +108,12 @@ export default function StoreAdminDashboardPage() {
                         className="inline-flex items-center gap-2 px-3.5 py-2 bg-[var(--surface)] border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] rounded-lg text-xs font-semibold transition-colors shadow-sm"
                     >
                         <Users size={14} /> Manage Employees
+                    </Link>
+                    <Link
+                        to="/store-admin/shifts"
+                        className="inline-flex items-center gap-2 px-3.5 py-2 bg-[var(--surface)] border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] rounded-lg text-xs font-semibold transition-colors shadow-sm"
+                    >
+                        <Clock3 size={14} /> Schedule Shifts
                     </Link>
                 </div>
             </div>

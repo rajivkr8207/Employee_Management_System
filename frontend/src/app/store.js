@@ -8,6 +8,7 @@ import adminReducer from "../features/admin/adminSlice";
 import storeReducer from "../features/store/storeSlice";
 import employeeReducer from "../features/employees/employeeSlice";
 import organizationReducer from "../features/organization/organizationSlice";
+import shiftScheduleReducer from "../features/shift/shiftSlice";
 
 export const store = configureStore({
   reducer: {
@@ -20,5 +21,6 @@ export const store = configureStore({
     store: storeReducer,
     employees: employeeReducer,
     organization: organizationReducer,
+    shiftSchedule: shiftScheduleReducer,
   },
 });
