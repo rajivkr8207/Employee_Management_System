@@ -7,6 +7,7 @@ import {
   createManualAttendance,
   getAttendance,
   getMyAttendance,
+  getTodayAttendance,
   listAttendance,
 } from './attendence.service.js';
 
@@ -14,7 +15,8 @@ export const checkInEmployee = asyncHandler(async (req, res) => {
   const attendance = await checkIn({
     userId: req.user.id,
     organizationId: req.body.organizationId,
-    location: req.body.location,
+    location: getRequestLocation(req.body),
+    imageBuffer: req.file?.buffer,
   });
   return res
     .status(201)
@@ -25,11 +27,29 @@ export const checkOutEmployee = asyncHandler(async (req, res) => {
   const attendance = await checkOut({
     userId: req.user.id,
     organizationId: req.body.organizationId,
-    location: req.body.location,
+    location: getRequestLocation(req.body),
+    imageBuffer: req.file?.buffer,
   });
   return res
     .status(200)
     .json(new ApiResponse(200, { attendance }, 'Check-out recorded successfully'));
+});
+
+const getRequestLocation = (body) =>
+  body.location || { lat: Number(body.lat), lng: Number(body.lng) };
+
+export const getTodayAttendanceStatus = asyncHandler(async (req, res) => {
+  const status = await getTodayAttendance({
+    userId: req.user.id,
+    organizationId: req.query.organizationId,
+    location:
+      req.query.lat !== undefined
+        ? { lat: Number(req.query.lat), lng: Number(req.query.lng) }
+        : undefined,
+  });
+  return res
+    .status(200)
+    .json(new ApiResponse(200, status, "Today's shift and attendance status fetched successfully"));
 });
 
 export const getMyAttendanceRecords = asyncHandler(async (req, res) => {

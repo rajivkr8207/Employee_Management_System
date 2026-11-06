@@ -35,6 +35,7 @@ export default function Register() {
     const [showPwd, setShowPwd] = useState(false);
     const [showCPwd, setShowCPwd] = useState(false);
     const [errors, setErrors] = useState({});
+    const [avatar, setAvatar] = useState(null);
 
     /* Invitation verification state */
     const [verifyingToken, setVerifyingToken] = useState(Boolean(token));
@@ -103,6 +104,7 @@ export default function Register() {
             mobile: form.mobile.trim(),
             password: form.password,
             token,
+            ...(avatar ? { avatar } : {}),
         };
         await register(payload);
     };
@@ -317,6 +319,22 @@ export default function Register() {
                                 />
                             </div>
                             {errors.mobile && <p className="text-xs text-[var(--danger)]">{errors.mobile}</p>}
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                            <label htmlFor="avatar" className="text-sm font-medium text-[var(--text-primary)]">
+                                Selfie for profile and face attendance (optional)
+                            </label>
+                            <input
+                                id="avatar"
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp"
+                                onChange={(event) => setAvatar(event.target.files?.[0] || null)}
+                                className="w-full text-sm text-[var(--text-secondary)] file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--primary-soft)] file:px-3 file:py-2 file:text-sm file:font-medium file:text-[var(--primary)]"
+                            />
+                            <p className="text-xs text-[var(--text-muted)]">
+                                Use a clear photo with only your face visible. You can enroll your face after signing in.
+                            </p>
                         </div>
 
                         {/* Password & Confirm Password */}

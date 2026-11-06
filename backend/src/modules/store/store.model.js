@@ -32,6 +32,10 @@ const storeSchema = new mongoose.Schema(
       lng: { type: Number, required: true },
       radius: { type: Number, default: 100 }, // metres
     },
+    timeZone: {
+      type: String,
+      default: 'Asia/Kolkata',
+    },
     managerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

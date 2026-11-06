@@ -15,8 +15,10 @@ import {
   getPendingStoreAdmins,
   approveStoreAdminAccount,
   rejectStoreAdminAccount,
+  enrollFace,
 } from './user.controller.js';
 import { verifyAdmin, verifyJWT } from '../../middlewares/auth.middleware.js';
+import { receiveImage } from '../../middlewares/imageUpload.middleware.js';
 import {
   loginValidation,
   registerValidation,
@@ -42,7 +44,7 @@ const authRouter = Router();
  * @desc    Register an employee account and send an email OTP
  * @access  Public
  */
-authRouter.post('/register', registerValidation, register);
+authRouter.post('/register', receiveImage, registerValidation, register);
 
 /**
  * @route   POST /api/v1/auth/verify-otp
@@ -59,6 +61,7 @@ authRouter.get(
 );
 authRouter.post(
   '/store-admin/register',
+  receiveImage,
   invitedStoreAdminRegisterValidation,
   registerInvitedStoreAdmin,
 );
@@ -93,6 +96,7 @@ authRouter.post('/logout', verifyJWT, logout);
  * @access  Protected
  */
 authRouter.get('/profile', verifyJWT, getProfile);
+authRouter.post('/face/enroll', verifyJWT, receiveImage, enrollFace);
 
 /**
  * @route   PATCH /api/v1/auth/profile

@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
-import Config from '../../config/Config.js';
+import Config from '../../config/config.js';
 import { ROLE_VALUES, ROLES } from '../../constants/roles.js';
 
 const userSchema = new mongoose.Schema(
@@ -55,6 +55,15 @@ const userSchema = new mongoose.Schema(
     },
     avatar: {
       type: String,
+      default: null,
+    },
+    faceEmbedding: {
+      type: [Number],
+      default: undefined,
+      select: false,
+    },
+    faceEnrolledAt: {
+      type: Date,
       default: null,
     },
     role: {
@@ -140,6 +149,7 @@ const userSchema = new mongoose.Schema(
         delete result.otpExpire;
         delete result.refreshTokenHash;
         delete result.refreshTokenVersion;
+        delete result.faceEmbedding;
         return result;
       },
     },

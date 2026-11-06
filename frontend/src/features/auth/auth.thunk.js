@@ -30,7 +30,22 @@ export const registerThunk = createAsyncThunk(
     async (payload, { rejectWithValue }) => {
         try {
             const endpoint = payload.token ? "/auth/store-admin/register" : "/auth/register";
-            const { data } = await api.post(endpoint, payload);
+            const body = payload.avatar ? new FormData() : payload;
+            if (body instanceof FormData) {
+                Object.entries(payload).forEach(([key, value]) => {
+                    if (key !== "avatar" && value !== undefined && value !== null) {
+                        body.append(key, value);
+                    }
+                });
+                body.append("image", payload.avatar);
+            }
+            const { data } = await api.post(
+                endpoint,
+                body,
+                body instanceof FormData
+                    ? { headers: { "Content-Type": "multipart/form-data" } }
+                    : undefined
+            );
             return data?.data || data;
         } catch (err) {
             return rejectWithValue(extractError(err));
