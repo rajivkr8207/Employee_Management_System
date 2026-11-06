@@ -8,10 +8,12 @@ import {
   updateStore,
   createStoreManager,
   listStoreManagers,
+  removeStoreManager,
+  setStoreManagerStatus,
 } from './store.service.js';
 
 export const getStores = asyncHandler(async (req, res) => {
-  const stores = await listStores(req.user.id);
+  const stores = await listStores(req.user.id, req.user.role);
   return res.status(200).json(new ApiResponse(200, { stores }, 'Stores fetched successfully'));
 });
 
@@ -47,4 +49,23 @@ export const getManagersForStore = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(new ApiResponse(200, { managers }, 'Store managers fetched successfully'));
+});
+
+export const updateManagerStatusForStore = asyncHandler(async (req, res) => {
+  const result = await setStoreManagerStatus(
+    req.params.storeId,
+    req.params.managerId,
+    req.body.isActive,
+    req.user.id,
+  );
+  return res.status(200).json(new ApiResponse(200, result, 'Manager status updated'));
+});
+
+export const removeManagerFromStore = asyncHandler(async (req, res) => {
+  const result = await removeStoreManager(
+    req.params.storeId,
+    req.params.managerId,
+    req.user.id,
+  );
+  return res.status(200).json(new ApiResponse(200, result, 'Manager removed from store'));
 });

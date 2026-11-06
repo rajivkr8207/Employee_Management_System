@@ -12,6 +12,7 @@ const employeeFields = [
   'employeeCode',
   'designation',
   'salary',
+  'Dob',
   'joiningDate',
   'status',
 ];
@@ -83,9 +84,8 @@ export const createEmployeeValidation = [
     .matches(/^[6-9]\d{9}$/)
     .withMessage('Please enter a valid mobile number'),
   body('employeeCode')
+    .optional()
     .trim()
-    .notEmpty()
-    .withMessage('Employee code is required')
     .isLength({ max: 50 })
     .withMessage('Employee code cannot exceed 50 characters'),
   body('designation')
@@ -95,6 +95,11 @@ export const createEmployeeValidation = [
     .isLength({ max: 100 })
     .withMessage('Designation cannot exceed 100 characters'),
   body('salary').isFloat({ min: 0 }).withMessage('Salary must be zero or greater').toFloat(),
+  body('Dob')
+    .optional({ values: 'falsy' })
+    .isISO8601()
+    .withMessage('Date of birth must be a valid date')
+    .toDate(),
   body('joiningDate')
     .optional()
     .isISO8601()

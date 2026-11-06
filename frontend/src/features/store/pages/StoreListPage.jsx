@@ -14,9 +14,20 @@ import {
   Navigation,
   ExternalLink,
   RefreshCw,
+  UserPlus,
+  UserRound,
 } from "lucide-react";
 import { toast } from "react-toastify";
-import { fetchMyStores, createStore, deleteStore, updateStore } from "../storeSlice";
+import {
+  fetchMyStores,
+  createStore,
+  deleteStore,
+  updateStore,
+  fetchStoreManagers,
+  createStoreManager,
+  updateStoreManager,
+  deleteStoreManager,
+} from "../storeSlice";
 
 const statusColors = {
   active: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
@@ -28,6 +39,7 @@ const statusColors = {
 function StoreCard({ store, onEdit, onDelete, onViewManagers }) {
   const hasCoordinates =
     typeof store.location?.lat === "number" && typeof store.location?.lng === "number";
+  const displayStatus = store.verificationStatus === "pending" ? "pending" : store.status;
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md transition-shadow">
@@ -45,10 +57,10 @@ function StoreCard({ store, onEdit, onDelete, onViewManagers }) {
         </div>
         <span
           className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize ${
-            statusColors[store.status] || statusColors.inactive
+            statusColors[displayStatus] || statusColors.inactive
           }`}
         >
-          {store.status || "inactive"}
+          {store.verificationStatus === "pending" ? "pending approval" : store.status || "inactive"}
         </span>
       </div>
 
@@ -91,7 +103,9 @@ function StoreCard({ store, onEdit, onDelete, onViewManagers }) {
         <button
           type="button"
           onClick={() => onViewManagers(store)}
-          className="flex items-center gap-1.5 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 font-medium transition-colors"
+          disabled={store.verificationStatus !== "approved" || store.status !== "active"}
+          title={store.verificationStatus !== "approved" ? "Available after admin approval" : "Manage store managers"}
+          className="flex items-center gap-1.5 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Users className="w-3.5 h-3.5" /> Managers
         </button>
@@ -462,13 +476,187 @@ function CreateStoreModal({ open, onClose, onSubmit, loading, initialData = null
   );
 }
 
+function StoreManagersModal({
+  store,
+  managers,
+  loading,
+  creating,
+  error,
+  onClose,
+  onAdd,
+  onToggle,
+  onDelete,
+}) {
+  const [form, setForm] = useState({
+    fullName: "",
+    username: "",
+    email: "",
+    mobile: "",
+    password: "",
+  });
+
+  if (!store) return null;
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    onAdd({
+      fullName: form.fullName.trim(),
+      username: form.username.trim().toLowerCase(),
+      email: form.email.trim().toLowerCase(),
+      mobile: form.mobile.trim() || undefined,
+      password: form.password,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-2xl bg-white dark:bg-gray-900 shadow-2xl">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Managers</h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{store.name}</p>
+          </div>
+          <button type="button" onClick={onClose} className="text-gray-500 hover:text-gray-900 dark:hover:text-white">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-5">
+          {error && (
+            <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>
+          )}
+
+          <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2">
+            <h3 className="sm:col-span-2 flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+              <UserPlus className="h-4 w-4 text-indigo-600" /> Add Store Manager
+            </h3>
+            <input
+              required
+              minLength={2}
+              maxLength={120}
+              placeholder="Full name"
+              value={form.fullName}
+              onChange={(event) => setForm((current) => ({ ...current, fullName: event.target.value }))}
+              className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white"
+            />
+            <input
+              required
+              minLength={3}
+              maxLength={30}
+              placeholder="Username"
+              value={form.username}
+              onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
+              className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white"
+            />
+            <input
+              required
+              type="email"
+              placeholder="Email"
+              value={form.email}
+              onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+              className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white"
+            />
+            <input
+              type="tel"
+              placeholder="Mobile (optional)"
+              value={form.mobile}
+              onChange={(event) => setForm((current) => ({ ...current, mobile: event.target.value }))}
+              className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white"
+            />
+            <input
+              required
+              minLength={6}
+              type="password"
+              placeholder="Temporary password"
+              value={form.password}
+              onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
+              className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white"
+            />
+            <button
+              type="submit"
+              disabled={creating}
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {creating ? "Adding manager..." : "Add manager"}
+            </button>
+          </form>
+
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+            <h3 className="mb-3 font-semibold text-gray-900 dark:text-white">
+              Store managers ({managers.length})
+            </h3>
+            {loading ? (
+              <p className="py-6 text-center text-sm text-gray-500">Loading managers...</p>
+            ) : managers.length === 0 ? (
+              <p className="py-6 text-center text-sm text-gray-500">No managers added to this store.</p>
+            ) : (
+              <div className="space-y-2">
+                {managers.map((manager) => (
+                  <div
+                    key={manager._id}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-gray-200 dark:border-gray-700 p-3"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                        <UserRound className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">{manager.fullName}</p>
+                        <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                          {manager.username} · {manager.email}
+                        </p>
+                        <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs ${
+                          manager.isActive
+                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                            : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                        }`}>
+                          {manager.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onToggle(manager)}
+                        className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+                      >
+                        {manager.isActive ? "Deactivate" : "Activate"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDelete(manager)}
+                        className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-900/20"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function StoreListPage() {
   const dispatch = useDispatch();
-  const { stores, loading, creating } = useSelector((state) => state.store);
+  const {
+    stores,
+    loading,
+    creating,
+    managers,
+    managerLoading,
+    managerCreating,
+    managerError,
+  } = useSelector((state) => state.store);
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [managerStore, setManagerStore] = useState(null);
 
   useEffect(() => {
     dispatch(fetchMyStores());
@@ -513,6 +701,50 @@ export default function StoreListPage() {
     setDeleteTarget(null);
   };
 
+  const handleOpenManagers = (store) => {
+    setManagerStore(store);
+    dispatch(fetchStoreManagers(store._id));
+  };
+
+  const handleAddManager = async (data) => {
+    const result = await dispatch(
+      createStoreManager({ storeId: managerStore._id, data })
+    );
+    if (result.error) {
+      toast.error(result.payload || "Failed to add manager");
+      return;
+    }
+    toast.success("Manager added successfully");
+    dispatch(fetchStoreManagers(managerStore._id));
+  };
+
+  const handleToggleManager = async (manager) => {
+    const result = await dispatch(
+      updateStoreManager({
+        storeId: managerStore._id,
+        managerId: manager._id,
+        isActive: !manager.isActive,
+      })
+    );
+    if (result.error) {
+      toast.error(result.payload || "Failed to update manager");
+      return;
+    }
+    toast.success(`Manager ${manager.isActive ? "deactivated" : "activated"}`);
+  };
+
+  const handleDeleteManager = async (manager) => {
+    if (!window.confirm(`Remove ${manager.fullName} from ${managerStore.name}?`)) return;
+    const result = await dispatch(
+      deleteStoreManager({ storeId: managerStore._id, managerId: manager._id })
+    );
+    if (result.error) {
+      toast.error(result.payload || "Failed to remove manager");
+      return;
+    }
+    toast.success("Manager removed from store");
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
@@ -522,16 +754,18 @@ export default function StoreListPage() {
             {stores.length} registered store{stores.length !== 1 ? "s" : ""} with GPS geofencing
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setEditTarget(null);
-            setShowModal(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
-        >
-          <Plus className="w-4 h-4" /> Add New Store
-        </button>
+        {!loading && stores.length === 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              setEditTarget(null);
+              setShowModal(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+          >
+            <Plus className="w-4 h-4" /> Add New Store
+          </button>
+        )}
       </div>
 
       <div className="relative mb-5">
@@ -559,7 +793,7 @@ export default function StoreListPage() {
               ? "No stores match your search query"
               : "Create your first store using 'Fetch My Location' to configure GPS coordinates"}
           </p>
-          {!search && (
+          {!search && stores.length === 0 && (
             <button
               type="button"
               onClick={() => {
@@ -583,7 +817,7 @@ export default function StoreListPage() {
                 setShowModal(true);
               }}
               onDelete={setDeleteTarget}
-              onViewManagers={(s) => toast.info(`Managing team for ${s.name}`)}
+              onViewManagers={handleOpenManagers}
             />
           ))}
         </div>
@@ -600,6 +834,20 @@ export default function StoreListPage() {
         loading={creating}
         initialData={editTarget}
       />
+
+      {managerStore && (
+        <StoreManagersModal
+          store={managerStore}
+          managers={managers[managerStore._id] || []}
+          loading={managerLoading}
+          creating={managerCreating}
+          error={managerError}
+          onClose={() => setManagerStore(null)}
+          onAdd={handleAddManager}
+          onToggle={handleToggleManager}
+          onDelete={handleDeleteManager}
+        />
+      )}
 
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">

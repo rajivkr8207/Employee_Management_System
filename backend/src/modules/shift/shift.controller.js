@@ -1,6 +1,15 @@
 import { ApiResponse } from '../../utils/ApiResponse.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
-import { createShift, deleteShift, getShift, listShifts, updateShift } from './shift.service.js';
+import {
+  createShift,
+  createShiftAssignment,
+  deleteShift,
+  deleteShiftAssignment,
+  getShift,
+  listShiftAssignments,
+  listShifts,
+  updateShift,
+} from './shift.service.js';
 
 export const addShift = asyncHandler(async (req, res) => {
   const shift = await createShift(req.body, req.user.id);
@@ -42,4 +51,32 @@ export const removeShift = asyncHandler(async (req, res) => {
     shiftId: req.params.shiftId,
   });
   return res.status(200).json(new ApiResponse(200, {}, 'Shift deleted successfully'));
+});
+
+export const getShiftAssignments = asyncHandler(async (req, res) => {
+  const assignments = await listShiftAssignments({
+    userId: req.user.id,
+    organizationId: req.query.organizationId,
+    storeId: req.query.storeId,
+    date: req.query.date,
+  });
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { assignments }, 'Shift assignments fetched successfully'));
+});
+
+export const addShiftAssignment = asyncHandler(async (req, res) => {
+  const assignment = await createShiftAssignment(req.body, req.user.id);
+  return res
+    .status(201)
+    .json(new ApiResponse(201, { assignment }, 'Employee shift scheduled successfully'));
+});
+
+export const removeShiftAssignment = asyncHandler(async (req, res) => {
+  await deleteShiftAssignment({
+    userId: req.user.id,
+    organizationId: req.query.organizationId,
+    assignmentId: req.params.assignmentId,
+  });
+  return res.status(200).json(new ApiResponse(200, {}, 'Shift assignment removed'));
 });

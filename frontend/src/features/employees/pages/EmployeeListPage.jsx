@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Plus, Users, Search, Trash2, Eye, Edit } from "lucide-react";
+import { Plus, Users, Search, Trash2, Eye } from "lucide-react";
 import { toast } from "react-toastify";
 import { fetchEmployees, createEmployee, deleteEmployee } from "../employeeSlice";
 import { fetchMyStores } from "../../store/storeSlice";
@@ -15,16 +15,22 @@ const statusBadge = {
   active: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   inactive: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
   blocked: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  terminated: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 };
 
-function AddEmployeeModal({ open, onClose, onSubmit, loading, stores }) {
+function AddEmployeeModal({ open, onClose, onSubmit, loading, stores, canAddManager }) {
   const [form, setForm] = useState({
     fullName: "",
+    username: "",
     email: "",
     mobile: "",
     password: "",
+    employeeCode: "",
+    Dob: "",
+    designation: "",
+    salary: "0",
     role: "employ",
-    storeId: "",
+    storeId: stores[0]?._id || "",
   });
 
   const handleChange = (e) =>
@@ -32,18 +38,33 @@ function AddEmployeeModal({ open, onClose, onSubmit, loading, stores }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!form.fullName.trim() || !form.email.trim() || !form.password.trim()) {
-      toast.error("Name, email and password are required");
+    const storeId = form.storeId || stores[0]?._id || "";
+    if (
+      !form.fullName.trim() ||
+      !form.username.trim() ||
+      !form.email.trim() ||
+      !form.password.trim() ||
+      !form.designation.trim() ||
+      !storeId
+    ) {
+      toast.error("Name, username, email, password, designation, and store are required");
       return;
     }
     const payload = {
-      fullName: form.fullName.trim(),
-      email: form.email.trim(),
-      password: form.password,
+      storeId,
       role: form.role,
+      employeeCode: form.employeeCode.trim() || undefined,
+      Dob: form.Dob || undefined,
+      designation: form.designation.trim(),
+      salary: Number(form.salary || 0),
+      user: {
+        fullName: form.fullName.trim(),
+        username: form.username.trim().toLowerCase(),
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
+      },
     };
-    if (form.mobile) payload.mobile = form.mobile.trim();
-    if (form.storeId) payload.storeId = form.storeId;
+    if (form.mobile) payload.user.mobile = form.mobile.trim();
     onSubmit(payload);
   };
 
@@ -73,6 +94,19 @@ function AddEmployeeModal({ open, onClose, onSubmit, loading, stores }) {
               value={form.fullName}
               onChange={handleChange}
               placeholder="e.g. Alex Morgan"
+              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Username *
+            </label>
+            <input
+              name="username"
+              value={form.username}
+              onChange={handleChange}
+              placeholder="alexmorgan"
+              autoComplete="off"
               className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
@@ -114,6 +148,58 @@ function AddEmployeeModal({ open, onClose, onSubmit, loading, stores }) {
               className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Employee Code
+              </label>
+              <input
+                name="employeeCode"
+                value={form.employeeCode}
+                onChange={handleChange}
+                placeholder="Auto-generated"
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Date of Birth
+              </label>
+              <input
+                name="Dob"
+                type="date"
+                value={form.Dob}
+                onChange={handleChange}
+                max={new Date().toISOString().slice(0, 10)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Designation *
+              </label>
+              <input
+                name="designation"
+                value={form.designation}
+                onChange={handleChange}
+                placeholder="Sales Associate"
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Monthly Salary
+            </label>
+            <input
+              name="salary"
+              type="number"
+              min="0"
+              value={form.salary}
+              onChange={handleChange}
+              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Assigned Role
@@ -125,21 +211,21 @@ function AddEmployeeModal({ open, onClose, onSubmit, loading, stores }) {
               className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="employ">Store Employee</option>
-              <option value="manager">Store Manager</option>
+              {canAddManager && <option value="manager">Store Manager</option>}
             </select>
           </div>
-          {stores && stores.length > 0 && (
+          {stores && stores.length > 0 ? (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Assign Store
+                Assign Store *
               </label>
               <select
                 name="storeId"
-                value={form.storeId}
+                value={form.storeId || stores[0]?._id || ""}
                 onChange={handleChange}
                 className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
-                <option value="">Select store (optional)</option>
+                <option value="">Select store</option>
                 {stores.map((s) => (
                   <option key={s._id} value={s._id}>
                     {s.name}
@@ -147,6 +233,10 @@ function AddEmployeeModal({ open, onClose, onSubmit, loading, stores }) {
                 ))}
               </select>
             </div>
+          ) : (
+            <p className="text-sm text-red-600">
+              Create an active store before adding an employee.
+            </p>
           )}
           <div className="flex gap-3 pt-2">
             <button
@@ -158,7 +248,7 @@ function AddEmployeeModal({ open, onClose, onSubmit, loading, stores }) {
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !stores.length}
               className="flex-1 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
             >
               {loading ? "Creating..." : "Add Employee"}
@@ -172,26 +262,63 @@ function AddEmployeeModal({ open, onClose, onSubmit, loading, stores }) {
 
 export default function EmployeeListPage() {
   const dispatch = useDispatch();
-  const { employees, loading, creating } = useSelector((state) => state.employees);
-  const { stores } = useSelector((state) => state.store || { stores: [] });
+  const { user } = useSelector((state) => state.auth);
+  const canAddManager = user?.role === "storeadmin" || user?.role === "admin";
+  const { employees, loading, creating, error: employeeError } = useSelector((state) => state.employees);
+  const { stores, error: storeError } = useSelector((state) => state.store || { stores: [] });
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [viewTarget, setViewTarget] = useState(null);
+  const organizationId = stores[0]?.organizationId?._id || stores[0]?.organizationId;
 
   useEffect(() => {
-    dispatch(fetchEmployees());
     dispatch(fetchMyStores());
   }, [dispatch]);
 
+  useEffect(() => {
+    if (organizationId) {
+      dispatch(fetchEmployees({ organizationId }));
+    }
+  }, [dispatch, organizationId]);
+
+  const getEmployeeUser = (emp) => {
+    if (emp.userId && typeof emp.userId === "object") return emp.userId;
+    if (emp.user && typeof emp.user === "object") return emp.user;
+    return {};
+  };
+  const getName = (emp) => {
+    const user = getEmployeeUser(emp);
+    return user.fullName || emp.fullName || user.name || emp.name || "Unnamed";
+  };
+  const getEmail = (emp) => {
+    const user = getEmployeeUser(emp);
+    return user.email || emp.email || "-";
+  };
+  const getMobile = (emp) => {
+    const user = getEmployeeUser(emp);
+    return user.mobile || user.phone || emp.mobile || emp.mobileno || "-";
+  };
+  const getRole = (emp) => {
+    const user = getEmployeeUser(emp);
+    return user.role || emp.role || emp.membershipRole || "employ";
+  };
+  const getStatus = (emp) => {
+    const user = getEmployeeUser(emp);
+    if (user.isActive === false) return "inactive";
+    return ["active", "inactive", "terminated"].includes(emp.status) ? emp.status : "active";
+  };
+
   const filtered = employees.filter((e) => {
-    const name = e.user?.fullName || e.fullName || "";
-    const email = e.user?.email || e.email || "";
-    const role = e.user?.role || e.role || "employ";
+    const name = getName(e);
+    const email = getEmail(e);
+    const role = getRole(e);
     const matchSearch =
       !search ||
       name.toLowerCase().includes(search.toLowerCase()) ||
-      email.toLowerCase().includes(search.toLowerCase());
+      email.toLowerCase().includes(search.toLowerCase()) ||
+      String(e.employeeCode || e.code || "").toLowerCase().includes(search.toLowerCase());
     const matchRole = !roleFilter || role === roleFilter;
     return matchSearch && matchRole;
   });
@@ -201,7 +328,9 @@ export default function EmployeeListPage() {
     if (!res.error) {
       toast.success("Employee added successfully!");
       setShowAdd(false);
-      dispatch(fetchEmployees());
+      if (organizationId) {
+        dispatch(fetchEmployees({ organizationId, force: true }));
+      }
     } else {
       toast.error(res.payload || "Failed to add employee");
     }
@@ -218,15 +347,13 @@ export default function EmployeeListPage() {
     setDeleteTarget(null);
   };
 
-  const getName = (emp) => emp.user?.fullName || emp.fullName || "Unnamed";
-  const getEmail = (emp) => emp.user?.email || emp.email || "-";
-  const getMobile = (emp) => emp.user?.mobile || emp.mobile || "-";
-  const getRole = (emp) => emp.user?.role || emp.role || "employ";
-  const getStatus = (emp) =>
-    emp.user?.isActive !== false && emp.status !== "inactive" ? "active" : "inactive";
-
   return (
     <div className="p-6 max-w-7xl mx-auto">
+      {(employeeError || storeError) && (
+        <div className="mb-4 p-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">
+          {employeeError || storeError}
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Employees</h1>
@@ -276,6 +403,9 @@ export default function EmployeeListPage() {
                   Contact
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Date of Birth
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Role
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -290,14 +420,14 @@ export default function EmployeeListPage() {
               {loading ? (
                 [...Array(5)].map((_, i) => (
                   <tr key={i}>
-                    <td colSpan={5} className="px-4 py-3">
+                    <td colSpan={6} className="px-4 py-3">
                       <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-3/4" />
                     </td>
                   </tr>
                 ))
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center">
+                  <td colSpan={6} className="px-4 py-12 text-center">
                     <Users className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
                     <p className="text-gray-600 dark:text-gray-400 font-medium">No employees found</p>
                     <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
@@ -343,6 +473,11 @@ export default function EmployeeListPage() {
                         {getMobile(emp)}
                       </p>
                     </td>
+                    <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
+                      {emp.Dob || emp.dob
+                        ? new Date(emp.Dob || emp.dob).toLocaleDateString()
+                        : "-"}
+                    </td>
                     <td className="px-4 py-3">
                       <span
                         className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize ${
@@ -365,17 +500,11 @@ export default function EmployeeListPage() {
                       <div className="flex items-center justify-end gap-2">
                         <button
                           type="button"
-                          onClick={() => toast.info(`Viewing details for ${getName(emp)}`)}
+                          onClick={() => setViewTarget(emp)}
                           className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded transition-colors"
+                          aria-label={`View details for ${getName(emp)}`}
                         >
                           <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => toast.info(`Editing ${getName(emp)}`)}
-                          className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded transition-colors"
-                        >
-                          <Edit className="w-4 h-4" />
                         </button>
                         <button
                           type="button"
@@ -400,7 +529,61 @@ export default function EmployeeListPage() {
         onSubmit={handleAdd}
         loading={creating}
         stores={stores}
+        canAddManager={canAddManager}
       />
+
+      {viewTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setViewTarget(null);
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="employee-details-title"
+            className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900"
+          >
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h2 id="employee-details-title" className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {getName(viewTarget)}
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {viewTarget.designation || "Employee"} · {viewTarget.employeeCode || "No employee code"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewTarget(null)}
+                className="text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                aria-label="Close employee details"
+              >
+                &times;
+              </button>
+            </div>
+            <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+              {[
+                ["Email", getEmail(viewTarget)],
+                ["Mobile", getMobile(viewTarget)],
+                ["Role", getRole(viewTarget) === "employ" ? "Employee" : getRole(viewTarget)],
+                ["Status", getStatus(viewTarget)],
+                ["Date of birth", viewTarget.Dob || viewTarget.dob ? new Date(viewTarget.Dob || viewTarget.dob).toLocaleDateString() : "Not provided"],
+                ["Joining date", viewTarget.joiningDate ? new Date(viewTarget.joiningDate).toLocaleDateString() : "Not provided"],
+                ["Store", viewTarget.storeId?.name || "Not assigned"],
+                ["Salary", viewTarget.salary == null ? "Not provided" : new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(viewTarget.salary)],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</dt>
+                  <dd className="mt-1 break-words text-sm text-gray-900 dark:text-white">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        </div>
+      )}
 
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">

@@ -87,6 +87,7 @@ function getNavSections(role, pendingUsersCount, pendingStoresCount, pendingMana
                     { label: "Assigned Stores", icon: Store, to: "/store-admin/stores" },
                     { label: "Store Managers", icon: ShieldCheck, to: "/store-admin/managers" },
                     { label: "Employees", icon: Users, to: "/store-admin/employees" },
+                    { label: "Shift Schedule", icon: Clock, to: "/store-admin/shifts" },
                 ],
             },
             {

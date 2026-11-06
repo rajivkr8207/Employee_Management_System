@@ -10,6 +10,12 @@ export const fetchMyStores = createAsyncThunk(
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || "Failed to fetch stores");
     }
+  },
+  {
+    condition: (options, { getState }) => {
+      const { loading, storesLoaded } = getState().store;
+      return !loading && (options?.force || !storesLoaded);
+    },
   }
 );
 
@@ -54,7 +60,7 @@ export const fetchStoreManagers = createAsyncThunk(
   async (storeId, { rejectWithValue }) => {
     try {
       const res = await storeService.getStoreManagers(storeId);
-      return { storeId, managers: res.data?.data || [] };
+      return { storeId, managers: res.data?.data?.managers || [] };
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || "Failed to fetch managers");
     }
@@ -66,9 +72,33 @@ export const createStoreManager = createAsyncThunk(
   async ({ storeId, data }, { rejectWithValue }) => {
     try {
       const res = await storeService.createStoreManager(storeId, data);
-      return res.data?.data || res.data;
+      return { storeId, ...(res.data?.data || res.data) };
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || "Failed to create manager");
+    }
+  }
+);
+
+export const updateStoreManager = createAsyncThunk(
+  "store/updateStoreManager",
+  async ({ storeId, managerId, isActive }, { rejectWithValue }) => {
+    try {
+      const res = await storeService.updateStoreManager(storeId, managerId, isActive);
+      return { storeId, managerId, ...res.data?.data };
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || "Failed to update manager");
+    }
+  }
+);
+
+export const deleteStoreManager = createAsyncThunk(
+  "store/deleteStoreManager",
+  async ({ storeId, managerId }, { rejectWithValue }) => {
+    try {
+      await storeService.deleteStoreManager(storeId, managerId);
+      return { storeId, managerId };
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || "Failed to remove manager");
     }
   }
 );
@@ -79,8 +109,12 @@ const storeSlice = createSlice({
     stores: [],
     managers: {},
     loading: false,
+    managerLoading: false,
+    storesLoaded: false,
     error: null,
     creating: false,
+    managerCreating: false,
+    managerError: null,
   },
   reducers: {
     clearStoreError: (state) => {
@@ -95,6 +129,7 @@ const storeSlice = createSlice({
       })
       .addCase(fetchMyStores.fulfilled, (state, action) => {
         state.loading = false;
+        state.storesLoaded = true;
         state.stores = Array.isArray(action.payload)
           ? action.payload
           : action.payload?.stores || [];
@@ -102,6 +137,24 @@ const storeSlice = createSlice({
       .addCase(fetchMyStores.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+      })
+      .addCase("auth/clearAuth", (state) => {
+        state.stores = [];
+        state.managers = {};
+        state.storesLoaded = false;
+        state.error = null;
+        state.managerError = null;
+        state.managerLoading = false;
+        state.managerCreating = false;
+      })
+      .addCase("auth/logout/fulfilled", (state) => {
+        state.stores = [];
+        state.managers = {};
+        state.storesLoaded = false;
+        state.error = null;
+        state.managerError = null;
+        state.managerLoading = false;
+        state.managerCreating = false;
       })
       .addCase(createStore.pending, (state) => {
         state.creating = true;
@@ -126,7 +179,71 @@ const storeSlice = createSlice({
         state.stores = state.stores.filter((s) => s._id !== action.payload);
       })
       .addCase(fetchStoreManagers.fulfilled, (state, action) => {
+        state.managerLoading = false;
         state.managers[action.payload.storeId] = action.payload.managers;
+        state.managerError = null;
+      })
+      .addCase(fetchStoreManagers.pending, (state) => {
+        state.managerLoading = true;
+        state.managerError = null;
+      })
+      .addCase(fetchStoreManagers.rejected, (state, action) => {
+        state.managerLoading = false;
+        state.managerError = action.payload;
+      })
+      .addCase(createStoreManager.pending, (state) => {
+        state.managerCreating = true;
+        state.managerError = null;
+      })
+      .addCase(createStoreManager.fulfilled, (state, action) => {
+        state.managerCreating = false;
+        state.managerError = null;
+        const { storeId, manager } = action.payload;
+        if (manager) {
+          const currentManagers = state.managers[storeId] || [];
+          if (!currentManagers.some((item) => item._id === manager._id)) {
+            state.managers[storeId] = [
+              ...currentManagers,
+              {
+                ...manager,
+                isActive: true,
+                membershipStatus: "active",
+                status: "active",
+              },
+            ];
+          }
+        }
+      })
+      .addCase(createStoreManager.rejected, (state, action) => {
+        state.managerCreating = false;
+        state.managerError = action.payload;
+      })
+      .addCase(updateStoreManager.fulfilled, (state, action) => {
+        const { storeId, managerId, isActive, status } = action.payload;
+        state.managers[storeId] = (state.managers[storeId] || []).map((manager) =>
+          manager._id === managerId
+            ? {
+                ...manager,
+                isActive,
+                membershipStatus: status,
+                status: isActive ? "active" : "inactive",
+              }
+            : manager
+        );
+        state.managerError = null;
+      })
+      .addCase(updateStoreManager.rejected, (state, action) => {
+        state.managerError = action.payload;
+      })
+      .addCase(deleteStoreManager.fulfilled, (state, action) => {
+        const { storeId, managerId } = action.payload;
+        state.managers[storeId] = (state.managers[storeId] || []).filter(
+          (manager) => manager._id !== managerId
+        );
+        state.managerError = null;
+      })
+      .addCase(deleteStoreManager.rejected, (state, action) => {
+        state.managerError = action.payload;
       });
   },
 });

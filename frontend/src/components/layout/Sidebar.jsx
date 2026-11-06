@@ -85,6 +85,7 @@ function getNavSections(role, pendingUsersCount, pendingStoresCount, pendingMana
                     { label: "Assigned Stores", icon: Store, to: "/store-admin/stores" },
                     { label: "Store Managers", icon: ShieldCheck, to: "/store-admin/managers" },
                     { label: "Employees", icon: Users, to: "/store-admin/employees" },
+                    { label: "Shift Schedule", icon: Clock, to: "/store-admin/shifts" },
                 ],
             },
             {
@@ -153,7 +154,7 @@ export default function Sidebar() {
         <aside
             className={[
                 "hidden md:flex flex-col fixed top-0 left-0 h-screen w-[260px] z-30",
-                "bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)]",
+                "bg-[var(--surface  )] border-r border-[var(--sidebar-border)]",
             ].join(" ")}
         >
             {/* ── Brand ── */}
@@ -162,7 +163,7 @@ export default function Sidebar() {
                     <Building2 size={18} className="text-indigo-300" />
                 </div>
                 <div className="min-w-0">
-                    <p className="text-sm font-bold text-white leading-none mb-1 truncate">
+                    <p className="text-sm font-bold text-[var(--text-primary)]       leading-none mb-1 truncate">
                         EMS Enterprise
                     </p>
                     <p className="text-[11px] text-[var(--sidebar-text-muted)] leading-none truncate font-medium">
@@ -198,8 +199,8 @@ export default function Sidebar() {
                                             className={[
                                                 "flex items-center justify-center w-7 h-7 rounded-lg shrink-0 transition-colors duration-150",
                                                 isActive
-                                                    ? "bg-white/[0.15] text-white"
-                                                    : "text-[var(--sidebar-text-muted)] group-hover:text-white",
+                                                    ? "bg-white/[0.15] text-[var(--primary)]"
+                                                    : "text-[var(--sidebar-text-muted)] group-hover:text-[var(--primary-hover)]",
                                             ].join(" ")}
                                         >
                                             <item.icon size={16} />
@@ -237,7 +238,7 @@ export default function Sidebar() {
                         {initials}
                     </div>
                     <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white leading-none mb-1 truncate">
+                        <p className="text-sm font-medium text-[var(--text-primary)] leading-none mb-1 truncate">
                             {user?.fullName || user?.name || "User"}
                         </p>
                         <p className="text-[11px] text-[var(--sidebar-text-muted)] leading-none truncate capitalize">

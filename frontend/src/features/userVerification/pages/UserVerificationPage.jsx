@@ -8,20 +8,15 @@ import {
     Eye,
     Check,
     X,
-    MessageSquare,
-    FileText,
     Mail,
     Phone,
-    MapPin,
     Calendar,
-    ExternalLink,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import {
     fetchUsersThunk,
     verifyUserThunk,
     rejectUserThunk,
-    requestUserInfoThunk,
     setActiveTab,
     setSelectedUser,
     clearSelectedUser,
@@ -36,7 +31,7 @@ import ConfirmDialog from "../../../components/Common/ConfirmDialog";
 
 export default function UserVerificationPage() {
     const dispatch = useDispatch();
-    const { users, activeTab, loading, actionLoading, selectedUser } = useSelector(
+    const { users, activeTab, loading, actionLoading, selectedUser, error } = useSelector(
         (state) => state.userVerification
     );
 
@@ -47,7 +42,7 @@ export default function UserVerificationPage() {
     // Confirm dialogs
     const [confirmModal, setConfirmModal] = useState({
         isOpen: false,
-        type: null, // "verify" | "reject" | "info"
+        type: null,
         user: null,
     });
 
@@ -107,17 +102,6 @@ export default function UserVerificationPage() {
         setConfirmModal({ isOpen: false, type: null, user: null });
     };
 
-    const handleRequestInfoConfirm = async (notes) => {
-        if (!confirmModal.user) return;
-        const res = await dispatch(requestUserInfoThunk({ userId: confirmModal.user.id, notes }));
-        if (!res.error) {
-            toast.success(`Information request sent to ${confirmModal.user.fullName}.`);
-        } else {
-            toast.error(res.payload || "Failed to submit request");
-        }
-        setConfirmModal({ isOpen: false, type: null, user: null });
-    };
-
     const tabs = [
         { id: "all", label: "All Users", count: counts.all, icon: Users },
         { id: "pending", label: "Pending Verification", count: counts.pending, icon: Clock, badgeVariant: "warning" },
@@ -131,13 +115,22 @@ export default function UserVerificationPage() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)]">
-                        User Verification Management
+                        Store Administrator Verification
                     </h1>
                     <p className="text-sm text-[var(--text-secondary)] mt-0.5">
-                        Inspect, verify credentials, and approve identity requests for new accounts
+                        Review store administrator accounts created from admin invitations
                     </p>
                 </div>
             </div>
+
+            {error && (
+                <div role="alert" className="flex items-center justify-between gap-4 rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-[var(--text-primary)]">
+                    <span>{error}</span>
+                    <Button variant="outline" size="sm" onClick={() => dispatch(fetchUsersThunk("all"))}>
+                        Retry
+                    </Button>
+                </div>
+            )}
 
             {/* ── Tabs & Search Bar ── */}
             <Card padding="sm" className="space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-4">
@@ -313,14 +306,6 @@ export default function UserVerificationPage() {
                                                                 <X size={16} />
                                                             </button>
 
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setConfirmModal({ isOpen: true, type: "info", user: u })}
-                                                                className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-500/10 transition-colors"
-                                                                title="Request Additional Information"
-                                                            >
-                                                                <MessageSquare size={16} />
-                                                            </button>
                                                         </>
                                                     )}
                                                 </div>
@@ -424,52 +409,20 @@ export default function UserVerificationPage() {
                             </div>
 
                             <div className="p-3.5 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)]">
-                                <p className="text-xs font-bold uppercase text-[var(--text-muted)] mb-2">Residential Address</p>
-                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed flex items-start gap-1.5">
-                                    <MapPin size={14} className="text-[var(--text-muted)] shrink-0 mt-0.5" />
-                                    {selectedUser.address || "Not provided"}
+                                <p className="text-xs font-bold uppercase text-[var(--text-muted)] mb-2">Approval Status</p>
+                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                                    {selectedUser.status === "verified"
+                                        ? "This store administrator has been approved."
+                                        : selectedUser.status === "rejected"
+                                            ? "This store administrator application was rejected."
+                                            : "This store administrator account is awaiting review."}
                                 </p>
                             </div>
                         </div>
 
-                        {/* Submitted Identity Documents */}
-                        <div>
-                            <p className="text-xs font-bold uppercase text-[var(--text-muted)] mb-3">
-                                Submitted Identity & Authorization Documents
-                            </p>
-                            <div className="space-y-2">
-                                {selectedUser.documents?.map((doc, dIdx) => (
-                                    <div
-                                        key={dIdx}
-                                        className="p-3 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] flex items-center justify-between"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-lg bg-[var(--surface-secondary)] text-[var(--primary)] flex items-center justify-center">
-                                                <FileText size={16} />
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-semibold text-[var(--text-primary)]">{doc.type}</p>
-                                                <p className="text-xs text-[var(--text-muted)]">{doc.name}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            {doc.verified ? (
-                                                <Badge variant="success">Doc Validated</Badge>
-                                            ) : (
-                                                <Badge variant="warning">Needs Check</Badge>
-                                            )}
-                                            <button
-                                                type="button"
-                                                onClick={() => toast.info(`Viewing ${doc.name}`)}
-                                                className="text-xs font-semibold text-[var(--primary)] hover:underline flex items-center gap-1 ml-2"
-                                            >
-                                                Preview <ExternalLink size={11} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+                        <p className="text-xs text-[var(--text-muted)]">
+                            No identity documents are attached to this invitation record.
+                        </p>
 
                         {/* If Rejected: Show Reason */}
                         {selectedUser.rejectionReason && (
@@ -479,13 +432,6 @@ export default function UserVerificationPage() {
                             </div>
                         )}
 
-                        {/* If Notes: Show Notes */}
-                        {selectedUser.notes && (
-                            <div className="p-3.5 rounded-[var(--radius-control)] bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400">
-                                <p className="text-xs font-bold uppercase mb-1">Admin Notes / Info Request</p>
-                                <p className="text-xs leading-relaxed">{selectedUser.notes}</p>
-                            </div>
-                        )}
                     </div>
                 </Modal>
             )}
@@ -517,20 +463,6 @@ export default function UserVerificationPage() {
                 loading={actionLoading}
             />
 
-            {/* ── Request Info Dialog ── */}
-            <ConfirmDialog
-                isOpen={confirmModal.isOpen && confirmModal.type === "info"}
-                onClose={() => setConfirmModal({ isOpen: false, type: null, user: null })}
-                onConfirm={handleRequestInfoConfirm}
-                title="Request Additional Information"
-                message={`Send a request to ${confirmModal.user?.fullName} specifying what additional documents or clarifications are required.`}
-                confirmLabel="Send Request"
-                variant="info"
-                requireReason={true}
-                reasonLabel="Requested Information / Notes"
-                reasonPlaceholder="e.g. Please provide a clear color scan of your Aadhaar card and appointment letter..."
-                loading={actionLoading}
-            />
         </div>
     );
 }

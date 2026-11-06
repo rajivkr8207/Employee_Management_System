@@ -6,4 +6,5 @@ export const employeeService = {
   updateEmployee: (id, data) => api.patch(`/employees/${id}`, data),
   deleteEmployee: (id) => api.delete(`/employees/${id}`),
   getEmployeeById: (id) => api.get(`/employees/${id}`),
+  getMyEmployee: () => api.get("/employees/me"),
 };

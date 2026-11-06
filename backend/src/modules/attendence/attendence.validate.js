@@ -64,11 +64,34 @@ const checkInBodyValidation = [
     .custom(
       (value) =>
         isObject(value) &&
-        Object.keys(value).every((field) => ['organizationId', 'location'].includes(field)),
+        Object.keys(value).every((field) =>
+          ['organizationId', 'location', 'lat', 'lng'].includes(field),
+        ) &&
+        ((isObject(value.location) && value.lat === undefined && value.lng === undefined) ||
+          (!value.location && value.lat !== undefined && value.lng !== undefined)),
     )
-    .withMessage('Only organizationId and location can be provided'),
+    .withMessage('Provide organizationId and one valid location format'),
   body('organizationId').isMongoId().withMessage('A valid organization ID is required'),
+  body('location')
+    .optional()
+    .custom(
+      (value) =>
+        isObject(value) &&
+        Object.keys(value).length === 2 &&
+        Object.keys(value).every((key) => allowedLocationFields.includes(key)),
+    )
+    .withMessage('Location must contain only latitude and longitude'),
   ...locationValidation('location'),
+  body('lat')
+    .if(body('lat').exists())
+    .isFloat({ min: -90, max: 90 })
+    .withMessage('Latitude must be between -90 and 90')
+    .toFloat(),
+  body('lng')
+    .if(body('lng').exists())
+    .isFloat({ min: -180, max: 180 })
+    .withMessage('Longitude must be between -180 and 180')
+    .toFloat(),
   validate,
 ];
 
@@ -81,6 +104,16 @@ export const checkInValidation = checkInBodyValidation;
 export const myAttendanceValidation = [
   query('organizationId').isMongoId().withMessage('A valid organization ID is required'),
   ...validateDateQuery,
+  validate,
+];
+
+export const todayAttendanceValidation = [
+  query('organizationId').isMongoId().withMessage('A valid organization ID is required'),
+  query('lat').optional().isFloat({ min: -90, max: 90 }).withMessage('Latitude must be valid'),
+  query('lng').optional().isFloat({ min: -180, max: 180 }).withMessage('Longitude must be valid'),
+  query()
+    .custom((value) => (value.lat === undefined) === (value.lng === undefined))
+    .withMessage('Latitude and longitude must be provided together'),
   validate,
 ];
 

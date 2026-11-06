@@ -1,15 +1,48 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import { employeeService } from "./services/employeeService";
 
+const getEmployeeListKey = (params = {}) => {
+  const { organizationId = "", storeId = "" } = params || {};
+  return `${organizationId}:${storeId}`;
+};
+
 export const fetchEmployees = createAsyncThunk(
   "employees/fetchEmployees",
-  async (params, { rejectWithValue }) => {
+  async (options, { rejectWithValue }) => {
     try {
+      const params = Object.fromEntries(
+        Object.entries(options || {}).filter(([key]) => key !== "force")
+      );
       const res = await employeeService.getEmployees(params);
       return res.data?.data || res.data;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || "Failed to fetch employees");
     }
+  },
+  {
+    condition: (options, { getState }) => {
+      const key = getEmployeeListKey(options);
+      const { employeeRequests, employeeListsLoaded } = getState().employees;
+      return !employeeRequests[key] && (options?.force || !employeeListsLoaded[key]);
+    },
+  }
+);
+
+export const fetchMyEmployee = createAsyncThunk(
+  "employees/fetchMyEmployee",
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await employeeService.getMyEmployee();
+      return res.data?.data?.employee || res.data?.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || "Failed to fetch your employee profile");
+    }
+  },
+  {
+    condition: (_, { getState }) => {
+      const { myEmployee, myEmployeeLoading } = getState().employees;
+      return !myEmployee && !myEmployeeLoading;
+    },
   }
 );
 
@@ -53,8 +86,14 @@ const employeeSlice = createSlice({
   name: "employees",
   initialState: {
     employees: [],
+    myEmployee: null,
+    employeeRequests: {},
+    employeeListsLoaded: {},
+    currentEmployeeListKey: null,
     total: 0,
     loading: false,
+    myEmployeeLoading: false,
+    myEmployeeError: null,
     creating: false,
     error: null,
   },
@@ -65,19 +104,57 @@ const employeeSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchEmployees.pending, (state) => {
+      .addCase(fetchMyEmployee.pending, (state) => {
+        state.myEmployeeLoading = true;
+        state.myEmployeeError = null;
+      })
+      .addCase(fetchMyEmployee.fulfilled, (state, action) => {
+        state.myEmployeeLoading = false;
+        state.myEmployee = action.payload;
+      })
+      .addCase(fetchMyEmployee.rejected, (state, action) => {
+        state.myEmployeeLoading = false;
+        state.myEmployeeError = action.payload;
+      })
+      .addCase("auth/clearAuth", (state) => {
+        state.employees = [];
+        state.myEmployee = null;
+        state.loading = false;
+        state.myEmployeeLoading = false;
+        state.employeeRequests = {};
+        state.employeeListsLoaded = {};
+        state.currentEmployeeListKey = null;
+        state.myEmployeeError = null;
+      })
+      .addCase("auth/logout/fulfilled", (state) => {
+        state.employees = [];
+        state.myEmployee = null;
+        state.loading = false;
+        state.myEmployeeLoading = false;
+        state.employeeRequests = {};
+        state.employeeListsLoaded = {};
+        state.currentEmployeeListKey = null;
+        state.myEmployeeError = null;
+      })
+      .addCase(fetchEmployees.pending, (state, action) => {
         state.loading = true;
         state.error = null;
+        state.employeeRequests[getEmployeeListKey(action.meta.arg)] = true;
       })
       .addCase(fetchEmployees.fulfilled, (state, action) => {
-        state.loading = false;
+        const key = getEmployeeListKey(action.meta.arg);
+        delete state.employeeRequests[key];
+        state.employeeListsLoaded[key] = true;
+        state.currentEmployeeListKey = action.meta.arg;
+        state.loading = Object.keys(state.employeeRequests).length > 0;
         state.employees = Array.isArray(action.payload)
           ? action.payload
           : action.payload?.employees || [];
         state.total = action.payload?.total || state.employees.length;
       })
       .addCase(fetchEmployees.rejected, (state, action) => {
-        state.loading = false;
+        delete state.employeeRequests[getEmployeeListKey(action.meta.arg)];
+        state.loading = Object.keys(state.employeeRequests).length > 0;
         state.error = action.payload;
       })
       .addCase(createEmployee.pending, (state) => {

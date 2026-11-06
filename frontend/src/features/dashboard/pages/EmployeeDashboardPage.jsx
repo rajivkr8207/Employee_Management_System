@@ -1,256 +1,391 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { Link } from "react-router-dom";
-import { useSelector } from "react-redux";
 import {
     CalendarCheck,
     CalendarOff,
-    Clock,
-    DollarSign,
-    Download,
-    TrendingUp,
+    Check,
+    Clock3,
+    Mail,
+    MapPin,
+    RefreshCw,
+    ScanFace,
+    UserRound,
 } from "lucide-react";
-import Card from "../../../components/ui/Card";
 import Badge from "../../../components/ui/Badge";
-import Button from "../../../components/ui/Button";
+import Card from "../../../components/ui/Card";
+import { fetchMyEmployee } from "../../employees/employeeSlice";
+import {
+    enrollMyFace,
+    fetchTodayAttendance,
+    recordCheckIn,
+    recordCheckOut,
+} from "../../attendance/attendanceSlice";
+import FaceAttendanceModal from "../../attendance/components/FaceAttendanceModal";
+
+const getOrganizationId = (value) => (typeof value === "string" ? value : value?._id);
+
+const getCurrentLocation = () =>
+    new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+            reject(new Error("Location access is not available in this browser."));
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(
+            ({ coords }) => resolve({ lat: coords.latitude, lng: coords.longitude }),
+            reject,
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 15000 },
+        );
+    });
+
+const formatShiftTime = (time) => {
+    if (!time) return "—";
+    const [hours, minutes] = time.split(":").map(Number);
+    const hour = hours % 12 || 12;
+    return `${hour}:${String(minutes).padStart(2, "0")} ${hours < 12 ? "AM" : "PM"}`;
+};
+
+const formatTime = (value) =>
+    value
+        ? new Intl.DateTimeFormat("en-IN", { hour: "numeric", minute: "2-digit" }).format(
+              new Date(value),
+          )
+        : "Not recorded";
+
+const formatDate = (value) => {
+    if (!value) return "Not provided";
+    return new Intl.DateTimeFormat("en-IN", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+    }).format(new Date(value));
+};
+
+const formatSalary = (value) => {
+    if (value === undefined || value === null) return "Not provided";
+    return new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: "INR",
+        maximumFractionDigits: 0,
+    }).format(value);
+};
 
 export default function EmployeeDashboardPage() {
+    const dispatch = useDispatch();
     const { user } = useSelector((state) => state.auth);
-    const [clockedIn, setClockedIn] = useState(true);
+    const {
+        today,
+        loading: attendanceLoading,
+        actionLoading,
+        enrollmentLoading,
+        error: attendanceError,
+    } =
+        useSelector((state) => state.attendance);
+    const { myEmployee, myEmployeeLoading, myEmployeeError } = useSelector(
+        (state) => state.employees
+    );
+    const [locationError, setLocationError] = useState("");
+    const [modalAction, setModalAction] = useState("");
 
-    const displayName = user?.fullName || user?.name || "Rohan Patel";
-    const employeeId = user?.employeeId || "EMP-2026-089";
-    const department = user?.department || "Retail Operations - Bandra Store";
-    const shift = "Morning Shift (08:00 AM - 04:30 PM)";
+    useEffect(() => {
+        dispatch(fetchMyEmployee());
+    }, [dispatch]);
 
-    const attendanceSummary = {
-        daysPresent: 22,
-        totalWorkingDays: 24,
-        onTimeRate: "96%",
-        totalHours: "176 hrs",
-        todayCheckIn: "07:58 AM",
-    };
+    const organizationId = getOrganizationId(myEmployee?.organizationId);
+    const refreshToday = useCallback(async () => {
+        if (!organizationId) return;
+        try {
+            const location = await getCurrentLocation();
+            setLocationError("");
+            dispatch(fetchTodayAttendance({ organizationId, location }));
+        } catch (error) {
+            setLocationError(
+                error.code === 1
+                    ? "Allow location access to check whether you are near your store."
+                    : error.message || "Unable to get your current location.",
+            );
+            dispatch(fetchTodayAttendance({ organizationId }));
+        }
+    }, [dispatch, organizationId]);
 
-    const leaveBalances = [
-        { type: "Casual Leave", total: 10, used: 3, remaining: 7, color: "var(--primary)" },
-        { type: "Sick Leave", total: 8, used: 1, remaining: 7, color: "var(--info)" },
-        { type: "Annual Leave", total: 15, used: 5, remaining: 10, color: "var(--success)" },
-    ];
+    useEffect(() => {
+        if (!organizationId) return undefined;
+        const initialRequest = window.setTimeout(refreshToday, 0);
+        const timer = window.setInterval(refreshToday, 30000);
+        return () => {
+            window.clearTimeout(initialRequest);
+            window.clearInterval(timer);
+        };
+    }, [organizationId, refreshToday]);
 
-    const recentLeaves = [
-        { id: "l1", type: "Sick Leave", dates: "Oct 14, 2026", days: 1, status: "approved", reason: "Viral fever" },
-        { id: "l2", type: "Casual Leave", dates: "Nov 06 - Nov 07", days: 2, status: "pending", reason: "Personal family commitment" },
-    ];
+    const verifyAndRecordAttendance = useCallback(
+        async (image) => {
+            try {
+                if (modalAction === "enroll") {
+                    await dispatch(enrollMyFace(image)).unwrap();
+                    try {
+                        const location = await getCurrentLocation();
+                        dispatch(fetchTodayAttendance({ organizationId, location }));
+                    } catch {
+                        dispatch(fetchTodayAttendance({ organizationId }));
+                    }
+                    return true;
+                }
+                const location = await getCurrentLocation();
+                setLocationError("");
+                const action = modalAction === "check-in" ? recordCheckIn : recordCheckOut;
+                await dispatch(action({ organizationId, location, image })).unwrap();
+                dispatch(fetchTodayAttendance({ organizationId, location }));
+                return true;
+            } catch (error) {
+                if (typeof error !== "string" && !error.response) {
+                    setLocationError(error.message || "Unable to verify your location.");
+                }
+                return false;
+            }
+        },
+        [dispatch, modalAction, organizationId],
+    );
+    const closeFaceModal = useCallback(() => setModalAction(""), []);
 
-    const salaryPreview = {
-        netSalary: "₹ 32,450",
-        payPeriod: "October 2026",
-        basic: "₹ 24,000",
-        allowances: "₹ 11,200",
-        deductions: "₹ 2,750",
-        status: "Paid",
-    };
+    if (myEmployeeLoading && !myEmployee) {
+        return (
+            <div className="min-h-64 flex items-center justify-center text-[var(--text-secondary)]">
+                Loading your employee profile...
+            </div>
+        );
+    }
+
+    if (myEmployeeError && !myEmployee) {
+        return (
+            <div className="max-w-3xl mx-auto p-6 rounded-[var(--radius-card)] bg-[var(--surface)] border border-[var(--border)]">
+                <h1 className="text-xl font-bold text-[var(--text-primary)]">Employee profile unavailable</h1>
+                <p className="mt-2 text-sm text-[var(--text-secondary)]">{myEmployeeError}</p>
+                <button
+                    type="button"
+                    onClick={() => dispatch(fetchMyEmployee())}
+                    className="mt-4 px-4 py-2 rounded-lg bg-[var(--primary)] text-white text-sm font-medium"
+                >
+                    Try again
+                </button>
+            </div>
+        );
+    }
+
+    if (!myEmployee) return null;
+
+    const employeeName = myEmployee.userId?.fullName || user?.fullName || "Employee";
+    const employeeEmail = myEmployee.userId?.email || user?.email || "Not provided";
+    const storeName = myEmployee.storeId?.name || "Not assigned";
+    const organizationName = myEmployee.organizationId?.name || "Not provided";
+    const initials = employeeName
+        .split(/\s+/)
+        .map((part) => part[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase();
 
     return (
-        <div className="space-y-6 animate-fade-in">
-            {/* ── Employee Welcome & Profile Banner ── */}
-            <div className="p-5 sm:p-6 rounded-[var(--radius-card)] bg-[var(--surface)] border border-[var(--border)] shadow-[var(--shadow-xs)]">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[var(--primary)] text-white flex items-center justify-center font-bold text-xl sm:text-2xl shadow-sm shrink-0">
-                            {displayName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
-                        </div>
-                        <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)]">
-                                    {displayName}
-                                </h1>
-                                <Badge variant="success" dot>Active Employee</Badge>
-                            </div>
-                            <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
-                                ID: <strong className="text-[var(--text-primary)]">{employeeId}</strong> • {department}
-                            </p>
-                            <p className="text-xs text-[var(--text-muted)] mt-0.5 flex items-center gap-1">
-                                <Clock size={12} /> Shift: {shift}
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Clock In / Out Quick Action */}
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pt-2 md:pt-0 border-t md:border-t-0 border-[var(--border)]">
-                        <div className="text-left sm:text-right">
-                            <p className="text-xs text-[var(--text-muted)]">Check-in Status</p>
-                            <p className="text-sm font-semibold text-[var(--text-primary)]">
-                                {clockedIn ? "Punched In at 07:58 AM" : "Not Checked In"}
-                            </p>
-                        </div>
-                        <Button
-                            variant={clockedIn ? "secondary" : "primary"}
-                            onClick={() => setClockedIn(!clockedIn)}
-                        >
-                            {clockedIn ? "Punch Out" : "Punch In Now"}
-                        </Button>
-                    </div>
-                </div>
-            </div>
-
-            {/* ── Metrics Grid: Attendance & Working Stats ── */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <Card padding="md">
-                    <div className="flex items-start justify-between mb-2">
-                        <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-500 flex items-center justify-center">
-                            <CalendarCheck size={20} />
-                        </div>
-                        <Badge variant="success">Current Month</Badge>
-                    </div>
-                    <p className="text-2xl font-bold text-[var(--text-primary)] mb-0.5">
-                        {attendanceSummary.daysPresent} / {attendanceSummary.totalWorkingDays}
-                    </p>
-                    <p className="text-sm text-[var(--text-secondary)]">Days Present</p>
-                    <p className="text-xs text-[var(--text-muted)] mt-1">92% Month Turnout</p>
-                </Card>
-
-                <Card padding="md">
-                    <div className="flex items-start justify-between mb-2">
-                        <div className="w-10 h-10 rounded-xl bg-indigo-500/15 text-indigo-500 flex items-center justify-center">
-                            <Clock size={20} />
-                        </div>
-                        <span className="text-xs text-indigo-500 font-semibold flex items-center gap-0.5">
-                            <TrendingUp size={12} /> {attendanceSummary.onTimeRate}
-                        </span>
-                    </div>
-                    <p className="text-2xl font-bold text-[var(--text-primary)] mb-0.5">
-                        {attendanceSummary.totalHours}
-                    </p>
-                    <p className="text-sm text-[var(--text-secondary)]">Logged Hours</p>
-                    <p className="text-xs text-[var(--text-muted)] mt-1">Avg 8.0 hrs/day</p>
-                </Card>
-
-                <Card padding="md">
-                    <div className="flex items-start justify-between mb-2">
-                        <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center">
-                            <CalendarOff size={20} />
-                        </div>
-                        <Badge variant="warning">Remaining</Badge>
-                    </div>
-                    <p className="text-2xl font-bold text-[var(--text-primary)] mb-0.5">24 Days</p>
-                    <p className="text-sm text-[var(--text-secondary)]">Total Leave Balance</p>
-                    <p className="text-xs text-[var(--text-muted)] mt-1">Across all leave categories</p>
-                </Card>
-
-                <Card padding="md">
-                    <div className="flex items-start justify-between mb-2">
-                        <div className="w-10 h-10 rounded-xl bg-blue-500/15 text-blue-500 flex items-center justify-center">
-                            <DollarSign size={20} />
-                        </div>
-                        <Badge variant="success">Paid</Badge>
-                    </div>
-                    <p className="text-2xl font-bold text-[var(--text-primary)] mb-0.5">
-                        {salaryPreview.netSalary}
-                    </p>
-                    <p className="text-sm text-[var(--text-secondary)]">Last Salary Disbursed</p>
-                    <p className="text-xs text-[var(--text-muted)] mt-1">October 2026 statement</p>
-                </Card>
-            </div>
-
-            {/* ── Leave Balances & Status ── */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Leave Balances */}
-                <Card padding="md" className="lg:col-span-1">
-                    <Card.Header withBorder>
-                        <Card.Title>Leave Category Balances</Card.Title>
-                        <Link to="/employee/leaves" className="text-xs text-[var(--primary)] font-semibold hover:underline">
-                            Apply
-                        </Link>
-                    </Card.Header>
-                    <Card.Body className="space-y-4 pt-1">
-                        {leaveBalances.map((item) => (
-                            <div key={item.type} className="space-y-1.5">
-                                <div className="flex justify-between text-xs font-medium">
-                                    <span className="text-[var(--text-primary)] font-semibold">{item.type}</span>
-                                    <span className="text-[var(--text-secondary)]">
-                                        {item.remaining} of {item.total} left
-                                    </span>
-                                </div>
-                                <div className="w-full h-2 rounded-full bg-[var(--surface-secondary)] overflow-hidden">
-                                    <div
-                                        className="h-full rounded-full"
-                                        style={{
-                                            width: `${(item.remaining / item.total) * 100}%`,
-                                            backgroundColor: item.color,
-                                        }}
-                                    />
-                                </div>
-                            </div>
-                        ))}
-
-                        <div className="pt-2">
-                            <Link to="/employee/leaves">
-                                <Button variant="outline" size="sm" className="w-full">
-                                    Submit New Leave Request
-                                </Button>
-                            </Link>
-                        </div>
-                    </Card.Body>
-                </Card>
-
-                {/* Recent Leave Requests */}
-                <Card padding="md" className="lg:col-span-2">
-                    <Card.Header withBorder>
-                        <Card.Title>My Recent Leave Requests</Card.Title>
-                        <Badge variant="info">Year 2026</Badge>
-                    </Card.Header>
-                    <Card.Body>
-                        <div className="divide-y divide-[var(--border)]">
-                            {recentLeaves.map((l) => (
-                                <div key={l.id} className="py-3 flex items-center justify-between text-sm first:pt-0 last:pb-0">
-                                    <div>
-                                        <p className="font-semibold text-[var(--text-primary)]">{l.type} ({l.days} {l.days === 1 ? "day" : "days"})</p>
-                                        <p className="text-xs text-[var(--text-muted)]">Dates: {l.dates} • Reason: {l.reason}</p>
-                                    </div>
-                                    <Badge variant={l.status === "approved" ? "success" : "warning"} dot>
-                                        {l.status}
-                                    </Badge>
-                                </div>
-                            ))}
-                        </div>
-                    </Card.Body>
-                </Card>
-            </div>
-
-            {/* ── Salary Slip & Payroll Preview ── */}
+        <div className="max-w-6xl mx-auto space-y-6 animate-fade-in">
             <Card padding="md">
                 <Card.Header withBorder>
                     <div>
-                        <Card.Title>Salary & Compensation Statement</Card.Title>
-                        <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                            Authorized payroll breakdown for period: {salaryPreview.payPeriod}
+                        <Card.Title>Today's shift</Card.Title>
+                        <p className="mt-1 text-xs text-[var(--text-muted)]">
+                            {today?.store?.name || storeName}
                         </p>
                     </div>
-                    <Button variant="outline" size="sm" icon={Download}>
-                        Download Payslip PDF
-                    </Button>
+                    <button
+                        type="button"
+                        onClick={refreshToday}
+                        disabled={attendanceLoading}
+                        className="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]"
+                    >
+                        <RefreshCw size={15} className={attendanceLoading ? "animate-spin" : ""} />
+                        Refresh
+                    </button>
                 </Card.Header>
                 <Card.Body>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 rounded-[var(--radius-control)] bg-[var(--surface-secondary)] border border-[var(--border)]">
-                        <div>
-                            <p className="text-xs text-[var(--text-muted)] uppercase">Basic Salary</p>
-                            <p className="text-base font-bold text-[var(--text-primary)] mt-0.5">{salaryPreview.basic}</p>
+                    {attendanceError && (
+                        <p role="alert" className="mb-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">
+                            {attendanceError}
+                        </p>
+                    )}
+                    {locationError && (
+                        <p role="alert" className="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+                            {locationError}
+                        </p>
+                    )}
+                    {!today?.shift ? (
+                        <div className="rounded-xl bg-[var(--surface-secondary)] p-4 text-sm text-[var(--text-secondary)]">
+                            {attendanceLoading ? "Loading today's shift..." : "No shift is assigned for today."}
                         </div>
-                        <div>
-                            <p className="text-xs text-[var(--text-muted)] uppercase">Allowances (HRA + Special)</p>
-                            <p className="text-base font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">{salaryPreview.allowances}</p>
+                    ) : (
+                        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <Clock3 size={18} className="text-[var(--primary)]" />
+                                    <h2 className="font-semibold text-[var(--text-primary)]">
+                                        {today.shift.name}
+                                    </h2>
+                                </div>
+                                <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                                    {formatShiftTime(today.shift.startTime)} – {formatShiftTime(today.shift.endTime)}
+                                </p>
+                                <p className="mt-2 flex items-center gap-1 text-xs text-[var(--text-muted)]">
+                                    <MapPin size={14} />
+                                    {today.distanceMeters === null || today.distanceMeters === undefined
+                                        ? "Store distance unavailable"
+                                        : `${today.distanceMeters} m from store · ${today.radius} m allowed`}
+                                </p>
+                            </div>
+                            <div className="flex flex-wrap gap-3">
+                                <div className="min-w-32 rounded-lg bg-[var(--surface-secondary)] px-3 py-2">
+                                    <p className="text-xs text-[var(--text-muted)]">Check-in</p>
+                                    <p className="text-sm font-medium text-[var(--text-primary)]">
+                                        {formatTime(today.attendance?.checkIn)}
+                                    </p>
+                                </div>
+                                <div className="min-w-32 rounded-lg bg-[var(--surface-secondary)] px-3 py-2">
+                                    <p className="text-xs text-[var(--text-muted)]">Check-out</p>
+                                    <p className="text-sm font-medium text-[var(--text-primary)]">
+                                        {formatTime(today.attendance?.checkOut)}
+                                    </p>
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <p className="text-xs text-[var(--text-muted)] uppercase">Deductions (PF + Tax)</p>
-                            <p className="text-base font-bold text-rose-600 dark:text-rose-400 mt-0.5">{salaryPreview.deductions}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-[var(--text-muted)] uppercase">Net Take-Home</p>
-                            <p className="text-lg font-extrabold text-[var(--primary)] mt-0.5">{salaryPreview.netSalary}</p>
-                        </div>
-                    </div>
+                    )}
+                    {today?.reason && (
+                        <p className="mt-3 text-sm text-[var(--text-secondary)]">{today.reason}</p>
+                    )}
+                    {today && !today.faceEnrolled && (
+                        <button
+                            type="button"
+                            onClick={() => setModalAction("enroll")}
+                            disabled={enrollmentLoading}
+                            className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-5 py-3 font-semibold text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 sm:w-auto"
+                        >
+                            <ScanFace size={18} />
+                            {enrollmentLoading ? "Enrolling face..." : "Enroll your face"}
+                        </button>
+                    )}
+                    {today?.faceEnrolled && (today?.canCheckIn || today?.canCheckOut) && (
+                        <button
+                            type="button"
+                            onClick={() => setModalAction(today.canCheckIn ? "check-in" : "check-out")}
+                            disabled={actionLoading}
+                            className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-5 py-3 font-semibold text-white hover:bg-[var(--primary-hover)] disabled:opacity-60 sm:w-auto"
+                        >
+                            {today.canCheckIn ? <MapPin size={18} /> : <Check size={18} />}
+                            {today.canCheckIn ? "Check in" : "Check out"}
+                        </button>
+                    )}
                 </Card.Body>
             </Card>
+
+            <section className="p-5 sm:p-7 rounded-[var(--radius-card)] bg-[var(--surface)] border border-[var(--border)] shadow-[var(--shadow-xs)]">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                    <div className="w-16 h-16 rounded-2xl bg-[var(--primary)] text-white flex items-center justify-center font-bold text-2xl shrink-0">
+                        {initials}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <h1 className="text-2xl font-bold text-[var(--text-primary)]">{employeeName}</h1>
+                            <Badge variant={myEmployee.status === "active" ? "success" : "warning"} dot>
+                                {myEmployee.status}
+                            </Badge>
+                        </div>
+                        <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                            {myEmployee.designation} · {myEmployee.employeeCode}
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <Card padding="md">
+                    <div className="flex items-center gap-3">
+                        <UserRound className="text-[var(--primary)]" size={20} />
+                        <div>
+                            <p className="text-xs text-[var(--text-muted)]">Employee ID</p>
+                            <p className="font-semibold text-[var(--text-primary)]">{myEmployee.employeeCode}</p>
+                        </div>
+                    </div>
+                </Card>
+                <Card padding="md">
+                    <div className="flex items-center gap-3">
+                        <MapPin className="text-[var(--primary)]" size={20} />
+                        <div>
+                            <p className="text-xs text-[var(--text-muted)]">Store</p>
+                            <p className="font-semibold text-[var(--text-primary)]">{storeName}</p>
+                            <p className="text-xs text-[var(--text-secondary)]">{organizationName}</p>
+                        </div>
+                    </div>
+                </Card>
+                <Card padding="md">
+                    <div className="flex items-center gap-3">
+                        <Mail className="text-[var(--primary)]" size={20} />
+                        <div className="min-w-0">
+                            <p className="text-xs text-[var(--text-muted)]">Work account</p>
+                            <p className="font-semibold text-[var(--text-primary)] break-all">{employeeEmail}</p>
+                        </div>
+                    </div>
+                </Card>
+                <Card padding="md">
+                    <p className="text-xs text-[var(--text-muted)]">Joining date</p>
+                    <p className="mt-1 font-semibold text-[var(--text-primary)]">
+                        {formatDate(myEmployee.joiningDate)}
+                    </p>
+                </Card>
+                <Card padding="md">
+                    <p className="text-xs text-[var(--text-muted)]">Monthly salary</p>
+                    <p className="mt-1 font-semibold text-[var(--text-primary)]">
+                        {formatSalary(myEmployee.salary)}
+                    </p>
+                </Card>
+                <Card padding="md">
+                    <p className="text-xs text-[var(--text-muted)]">Position</p>
+                    <p className="mt-1 font-semibold text-[var(--text-primary)]">
+                        {myEmployee.designation}
+                    </p>
+                </Card>
+            </section>
+
+            <section className="grid gap-4 sm:grid-cols-2">
+                <Link
+                    to="/employee/attendance"
+                    className="p-5 rounded-[var(--radius-card)] bg-[var(--surface)] border border-[var(--border)] hover:border-[var(--primary)] transition-colors"
+                >
+                    <div className="flex items-center gap-3">
+                        <CalendarCheck className="text-[var(--primary)]" size={22} />
+                        <div>
+                            <h2 className="font-semibold text-[var(--text-primary)]">My attendance</h2>
+                            <p className="text-sm text-[var(--text-secondary)]">View your attendance records</p>
+                        </div>
+                    </div>
+                </Link>
+                <Link
+                    to="/employee/leaves"
+                    className="p-5 rounded-[var(--radius-card)] bg-[var(--surface)] border border-[var(--border)] hover:border-[var(--primary)] transition-colors"
+                >
+                    <div className="flex items-center gap-3">
+                        <CalendarOff className="text-[var(--primary)]" size={22} />
+                        <div>
+                            <h2 className="font-semibold text-[var(--text-primary)]">My leave requests</h2>
+                            <p className="text-sm text-[var(--text-secondary)]">Review or request time off</p>
+                        </div>
+                    </div>
+                </Link>
+            </section>
+            {modalAction && (
+                <FaceAttendanceModal
+                    action={modalAction}
+                    loading={modalAction === "enroll" ? enrollmentLoading : actionLoading}
+                    error={attendanceError}
+                    onClose={closeFaceModal}
+                    onVerified={verifyAndRecordAttendance}
+                />
+            )}
         </div>
     );
 }

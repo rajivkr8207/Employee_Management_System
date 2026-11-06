@@ -79,6 +79,17 @@ export const storeAdminApprovalValidation = [
   validate,
 ];
 
+export const storeAdminRejectionValidation = [
+  param('userId').isMongoId().withMessage('A valid user ID is required'),
+  body('reason')
+    .trim()
+    .notEmpty()
+    .withMessage('A rejection reason is required')
+    .isLength({ max: 500 })
+    .withMessage('Rejection reason cannot exceed 500 characters'),
+  validate,
+];
+
 export const invitedStoreAdminRegisterValidation = [
   body('token')
     .trim()

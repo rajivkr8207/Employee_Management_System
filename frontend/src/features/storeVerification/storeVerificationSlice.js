@@ -34,17 +34,6 @@ export const rejectStoreThunk = createAsyncThunk(
     }
 );
 
-export const requestStoreDocsThunk = createAsyncThunk(
-    "storeVerification/requestDocs",
-    async ({ storeId, notes }, { rejectWithValue }) => {
-        try {
-            return await storeVerificationService.requestAdditionalDocs(storeId, notes);
-        } catch (err) {
-            return rejectWithValue(err.message || "Failed to request additional documents");
-        }
-    }
-);
-
 const storeVerificationSlice = createSlice({
     name: "storeVerification",
     initialState: {
@@ -112,26 +101,9 @@ const storeVerificationSlice = createSlice({
             .addCase(rejectStoreThunk.rejected, (state, action) => {
                 state.actionLoading = false;
                 state.error = action.payload;
-            })
-            // Request Docs
-            .addCase(requestStoreDocsThunk.pending, (state) => {
-                state.actionLoading = true;
-            })
-            .addCase(requestStoreDocsThunk.fulfilled, (state, action) => {
-                state.actionLoading = false;
-                const updated = action.payload;
-                state.stores = state.stores.map((s) => (s.id === updated.id ? updated : s));
-                if (state.selectedStore?.id === updated.id) {
-                    state.selectedStore = updated;
-                }
-            })
-            .addCase(requestStoreDocsThunk.rejected, (state, action) => {
-                state.actionLoading = false;
-                state.error = action.payload;
             });
     },
 });
 
 export const { setActiveTab, setSelectedStore, clearSelectedStore } = storeVerificationSlice.actions;
 export default storeVerificationSlice.reducer;
-

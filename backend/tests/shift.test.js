@@ -19,6 +19,7 @@ const { organizationModel } = await import('../src/modules/organization/organiza
 const { StoreModel } = await import('../src/modules/store/store.model.js');
 const { MembershipModel } = await import('../src/modules/membership/membership.model.js');
 const { ShiftModel } = await import('../src/modules/shift/shift.model.js');
+const { EmployeeModel } = await import('../src/modules/employee/employee.model.js');
 const { connectTestDB, closeTestDB, clearTestDB } = await import('./setup.js');
 
 const createUser = async (username, role = ROLES.STORE_ADMIN) => {
@@ -147,6 +148,7 @@ describe('Shift API', () => {
 
   it('limits managers to assigned stores and blocks unauthenticated requests', async () => {
     const { user: owner } = await createUser('shiftscopeowner');
+    const { user: otherOwner } = await createUser('shiftscopeotherowner');
     const { user: scopedManager, token: managerToken } = await createUser(
       'shiftscopemanager',
       ROLES.EMPLOYEE,
@@ -161,7 +163,7 @@ describe('Shift API', () => {
       name: 'Other Store',
       code: 'SHIFT-DENIED',
       location: { lat: 19, lng: 72 },
-      createdBy: owner.id,
+      createdBy: otherOwner.id,
     });
     await MembershipModel.create({
       userId: scopedManager.id,
@@ -187,5 +189,115 @@ describe('Shift API', () => {
       .set(headers)
       .send(shiftDetails(organization.id, deniedStore.id, { name: 'Denied' }));
     expect(denied.statusCode).toBe(403);
+  });
+
+  it('lets an assigned manager schedule active employees and prevents duplicate daily assignments', async () => {
+    const { user: owner, token: ownerToken } = await createUser('shiftassignowner');
+    const { organization, store } = await createOrganizationAndStore(
+      owner.id,
+      'shiftassignowner@example.org',
+      'SHIFT-ASSIGN',
+    );
+    const { user: manager, token: managerToken } = await createUser(
+      'shiftassignmanager',
+      ROLES.EMPLOYEE,
+    );
+    const { user: employeeUser } = await createUser('shiftemployee', ROLES.EMPLOYEE);
+    const employee = await EmployeeModel.create({
+      organizationId: organization.id,
+      storeId: store.id,
+      userId: employeeUser.id,
+      employeeCode: 'EMP-001',
+      designation: 'Cashier',
+      salary: 30000,
+    });
+    await MembershipModel.create({
+      userId: manager.id,
+      organizationId: organization.id,
+      storeIds: [store.id],
+      role: 'manager',
+    });
+
+    const createdShift = await request(app)
+      .post('/api/v1/shifts')
+      .set({ Cookie: `accessToken=${ownerToken}` })
+      .send(shiftDetails(organization.id, store.id));
+    expect(createdShift.statusCode).toBe(201);
+    const shiftId = createdShift.body.data.shift._id;
+    const headers = { Cookie: `accessToken=${managerToken}` };
+    const assignmentData = {
+      organizationId: organization.id,
+      storeId: store.id,
+      employeeId: employee.id,
+      shiftId,
+      date: '2026-07-14',
+    };
+
+    const scheduled = await request(app)
+      .post('/api/v1/shifts/assignments')
+      .set(headers)
+      .send(assignmentData);
+    expect(scheduled.statusCode).toBe(201);
+    expect(scheduled.body.data.assignment.employeeId._id).toBe(employee.id);
+    expect(scheduled.body.data.assignment.shiftId._id).toBe(shiftId);
+
+    const duplicate = await request(app)
+      .post('/api/v1/shifts/assignments')
+      .set(headers)
+      .send(assignmentData);
+    expect(duplicate.statusCode).toBe(409);
+
+    const { user: otherStoreOwner } = await createUser('shiftassignotherowner');
+    const otherStore = await StoreModel.create({
+      organizationId: organization.id,
+      name: 'Other Store',
+      code: 'SHIFT-ASSIGN-OTHER',
+      location: { lat: 19, lng: 72 },
+      createdBy: otherStoreOwner.id,
+    });
+    const { user: otherEmployeeUser } = await createUser('shiftotheremployee', ROLES.EMPLOYEE);
+    const otherEmployee = await EmployeeModel.create({
+      organizationId: organization.id,
+      storeId: otherStore.id,
+      userId: otherEmployeeUser.id,
+      employeeCode: 'EMP-002',
+      designation: 'Stock Associate',
+      salary: 30000,
+    });
+    const mismatchedEmployee = await request(app)
+      .post('/api/v1/shifts/assignments')
+      .set(headers)
+      .send({ ...assignmentData, employeeId: otherEmployee.id, date: '2026-07-15' });
+    expect(mismatchedEmployee.statusCode).toBe(404);
+
+    const outOfScope = await request(app)
+      .post('/api/v1/shifts/assignments')
+      .set(headers)
+      .send({
+        ...assignmentData,
+        storeId: otherStore.id,
+        employeeId: otherEmployee.id,
+        date: '2026-07-15',
+      });
+    expect(outOfScope.statusCode).toBe(403);
+
+    const list = await request(app)
+      .get(`/api/v1/shifts/assignments?organizationId=${organization.id}&storeId=${store.id}&date=2026-07-14`)
+      .set(headers);
+    expect(list.statusCode).toBe(200);
+    expect(list.body.data.assignments).toHaveLength(1);
+
+    const removed = await request(app)
+      .delete(
+        `/api/v1/shifts/assignments/${scheduled.body.data.assignment._id}?organizationId=${organization.id}`,
+      )
+      .set(headers);
+    expect(removed.statusCode).toBe(200);
+    expect(
+      await request(app)
+        .get(`/api/v1/shifts/assignments?organizationId=${organization.id}&storeId=${store.id}`)
+        .set(headers)
+        .then((response) => response.body.data.assignments),
+    ).toHaveLength(0);
   });
 });

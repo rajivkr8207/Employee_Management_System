@@ -1,292 +1,280 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-    Store,
-    Users,
-    ShieldCheck,
-    CalendarOff,
-    UserCheck,
-    UserX,
-    Clock,
-    Building2,
-    TrendingUp,
-} from "lucide-react";
+import { useDispatch, useSelector } from "react-redux";
+import { Building2, Clock3, Mail, MapPin, Store, Users, UserRound } from "lucide-react";
 import Card from "../../../components/ui/Card";
 import Badge from "../../../components/ui/Badge";
 import Button from "../../../components/ui/Button";
+import { fetchEmployees } from "../../employees/employeeSlice";
+import { fetchMyStores } from "../../store/storeSlice";
+
+const formatDate = (value) => {
+    if (!value) return "Not provided";
+    return new Intl.DateTimeFormat("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+    }).format(new Date(value));
+};
+
+const formatSalary = (value) => {
+    if (value === undefined || value === null) return "—";
+    return new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: "INR",
+        maximumFractionDigits: 0,
+    }).format(value);
+};
 
 export default function StoreAdminDashboardPage() {
+    const dispatch = useDispatch();
+    const { stores, loading: storesLoading, error: storesError } = useSelector((state) => state.store);
+    const {
+        employees,
+        loading: employeesLoading,
+        error: employeesError,
+    } = useSelector((state) => state.employees);
     const [selectedStore, setSelectedStore] = useState("all");
 
-    // Mock data for assigned stores
-    const assignedStores = [
-        { id: "str_1", name: "Nexus Superstore - Bandra", code: "STR-MUM-01", location: "Mumbai", employees: 34, managers: 2, attendanceRate: 94 },
-        { id: "str_2", name: "QuickMart Express - Indiranagar", code: "STR-BLR-02", location: "Bengaluru", employees: 28, managers: 1, attendanceRate: 89 },
-        { id: "str_3", name: "Apex Hypermarket - CyberCity", code: "STR-GGN-03", location: "Gurugram", employees: 45, managers: 2, attendanceRate: 91 },
-    ];
+    const organizationId = stores[0]?.organizationId?._id || stores[0]?.organizationId;
 
-    const todayAttendance = {
-        total: 107,
-        present: 96,
-        absent: 6,
-        onLeave: 5,
-        pendingLeaves: 4,
+    useEffect(() => {
+        dispatch(fetchMyStores());
+    }, [dispatch]);
+
+    useEffect(() => {
+        if (organizationId) {
+            dispatch(fetchEmployees({ organizationId }));
+        }
+    }, [dispatch, organizationId]);
+
+    const filteredEmployees = useMemo(
+        () =>
+            selectedStore === "all"
+                ? employees
+                : employees.filter((employee) => {
+                    const storeId = employee.storeId?._id || employee.storeId;
+                    return storeId === selectedStore;
+                }),
+        [employees, selectedStore]
+    );
+
+    const managerCount = employees.filter(
+        (employee) => ["manager", "storemanager"].includes(
+            String(employee.userId?.role || "").toLowerCase().replace(/[-_]/g, "")
+        )
+    ).length;
+    const activeCount = employees.filter((employee) => employee.status === "active").length;
+    const loading = storesLoading || employeesLoading;
+    const error = storesError || employeesError;
+
+    const retryLoading = () => {
+        dispatch(fetchMyStores({ force: true }));
+        if (organizationId) {
+            dispatch(fetchEmployees({ organizationId, force: true }));
+        }
     };
-
-    const presentEmployees = [
-        { id: "emp_1", name: "Amit Sharma", role: "Cashier Lead", store: "Bandra", inTime: "08:55 AM" },
-        { id: "emp_2", name: "Priya Nair", role: "Floor Supervisor", store: "Indiranagar", inTime: "09:02 AM" },
-        { id: "emp_3", name: "Sunil Verma", role: "Inventory Specialist", store: "CyberCity", inTime: "08:45 AM" },
-        { id: "emp_4", name: "Divya Rao", role: "Customer Service", store: "Bandra", inTime: "09:10 AM" },
-    ];
-
-    const absentEmployees = [
-        { id: "emp_5", name: "Deepak Joshi", role: "Warehouse Associate", store: "CyberCity", reason: "Unannounced" },
-        { id: "emp_6", name: "Sneha Patil", role: "Billing Associate", store: "Indiranagar", reason: "Medical Emergency" },
-    ];
-
-    const pendingLeaves = [
-        { id: "lv_1", name: "Ramesh Pawar", store: "Bandra", type: "Sick Leave", duration: "Nov 03 - Nov 05 (3 days)", reason: "Fever & recovery" },
-        { id: "lv_2", name: "Anjali Gupta", store: "Indiranagar", type: "Casual Leave", duration: "Nov 04 (1 day)", reason: "Personal family event" },
-        { id: "lv_3", name: "Vikas Sethi", store: "CyberCity", type: "Annual Leave", duration: "Nov 10 - Nov 14 (5 days)", reason: "Annual family vacation" },
-    ];
-
-    const recentActivities = [
-        { id: "act_1", text: "New employee Pooja R. onboarded at Bandra Store", time: "25 mins ago", type: "user" },
-        { id: "act_2", text: "Inventory audit completed for Indiranagar Store", time: "2 hours ago", type: "audit" },
-        { id: "act_3", text: "Rajesh Kulkarni approved shift schedule for CyberCity", time: "4 hours ago", type: "shift" },
-        { id: "act_4", text: "Store maintenance ticket resolved at Bandra location", time: "Yesterday", type: "maintenance" },
-    ];
 
     return (
         <div className="space-y-6 animate-fade-in">
-            {/* ── Page Header & Store Filter ── */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)]">
                         Store Admin Dashboard
                     </h1>
                     <p className="text-sm text-[var(--text-secondary)] mt-1">
-                        Oversee assigned stores, store managers, attendance, and branch compliance
+                        Your stores and employee records
                     </p>
                 </div>
-
                 <div className="flex flex-wrap items-center gap-3">
                     <select
                         value={selectedStore}
-                        onChange={(e) => setSelectedStore(e.target.value)}
-                        className="text-xs px-2.5 py-1.5 rounded-[var(--radius-control)] bg-[var(--surface)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary)]"
+                        onChange={(event) => setSelectedStore(event.target.value)}
+                        className="text-xs px-2.5 py-2 rounded-[var(--radius-control)] bg-[var(--surface)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary)]"
                     >
-                        <option value="all">All Stores ({assignedStores.length})</option>
-                        {assignedStores.map((st) => (
-                            <option key={st.id} value={st.id}>{st.name}</option>
+                        <option value="all">All Stores ({stores.length})</option>
+                        {stores.map((store) => (
+                            <option key={store._id} value={store._id}>{store.name}</option>
                         ))}
                     </select>
                     <Link
-                        to="/store-admin/organization"
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--surface)] border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] rounded-lg text-xs font-semibold transition-colors shadow-sm"
-                    >
-                        <Building2 size={14} className="text-indigo-500" /> Organization
-                    </Link>
-                    <Link
                         to="/store-admin/stores"
-                        className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-sm"
+                        className="inline-flex items-center gap-2 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-sm"
                     >
                         <Store size={14} /> My Stores
                     </Link>
                     <Link
                         to="/store-admin/employees"
-                        className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-[var(--surface)] border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] rounded-lg text-xs font-semibold transition-colors shadow-sm"
+                        className="inline-flex items-center gap-2 px-3.5 py-2 bg-[var(--surface)] border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] rounded-lg text-xs font-semibold transition-colors shadow-sm"
                     >
-                        <Users size={14} /> Employees
+                        <Users size={14} /> Manage Employees
+                    </Link>
+                    <Link
+                        to="/store-admin/shifts"
+                        className="inline-flex items-center gap-2 px-3.5 py-2 bg-[var(--surface)] border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] rounded-lg text-xs font-semibold transition-colors shadow-sm"
+                    >
+                        <Clock3 size={14} /> Schedule Shifts
                     </Link>
                 </div>
             </div>
 
-            {/* ── Key Metrics Grid ── */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <Card padding="md">
-                    <div className="flex items-start justify-between mb-2">
-                        <div className="w-10 h-10 rounded-xl bg-indigo-500/15 text-indigo-500 flex items-center justify-center">
-                            <Store size={20} />
-                        </div>
-                        <Badge variant="primary">Assigned</Badge>
-                    </div>
-                    <p className="text-2xl font-bold text-[var(--text-primary)] mb-0.5">3</p>
-                    <p className="text-sm text-[var(--text-secondary)]">Assigned Stores</p>
-                    <p className="text-xs text-[var(--text-muted)] mt-1">Mumbai, Bengaluru, Gurugram</p>
-                </Card>
+            {error && (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border border-rose-300 bg-rose-50 text-rose-700">
+                    <p className="text-sm">{error}</p>
+                    <Button size="sm" variant="outline" onClick={retryLoading}>Retry</Button>
+                </div>
+            )}
 
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Card padding="md">
-                    <div className="flex items-start justify-between mb-2">
-                        <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-500 flex items-center justify-center">
-                            <ShieldCheck size={20} />
+                    <div className="flex items-center gap-3">
+                        <Store className="text-indigo-500" size={22} />
+                        <div>
+                            <p className="text-2xl font-bold text-[var(--text-primary)]">{stores.length}</p>
+                            <p className="text-sm text-[var(--text-secondary)]">Assigned stores</p>
                         </div>
-                        <Badge variant="success">Active</Badge>
                     </div>
-                    <p className="text-2xl font-bold text-[var(--text-primary)] mb-0.5">5</p>
-                    <p className="text-sm text-[var(--text-secondary)]">Store Managers</p>
-                    <p className="text-xs text-[var(--text-muted)] mt-1">Across all branches</p>
                 </Card>
-
                 <Card padding="md">
-                    <div className="flex items-start justify-between mb-2">
-                        <div className="w-10 h-10 rounded-xl bg-blue-500/15 text-blue-500 flex items-center justify-center">
-                            <Users size={20} />
+                    <div className="flex items-center gap-3">
+                        <Users className="text-blue-500" size={22} />
+                        <div>
+                            <p className="text-2xl font-bold text-[var(--text-primary)]">{employees.length}</p>
+                            <p className="text-sm text-[var(--text-secondary)]">Total employees</p>
                         </div>
-                        <span className="text-xs text-emerald-500 font-semibold flex items-center gap-0.5">
-                            <TrendingUp size={12} /> +4 this mo
-                        </span>
                     </div>
-                    <p className="text-2xl font-bold text-[var(--text-primary)] mb-0.5">107</p>
-                    <p className="text-sm text-[var(--text-secondary)]">Total Employees</p>
-                    <p className="text-xs text-[var(--text-muted)] mt-1">Full-time & retail shifts</p>
                 </Card>
-
                 <Card padding="md">
-                    <div className="flex items-start justify-between mb-2">
-                        <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center">
-                            <CalendarOff size={20} />
+                    <div className="flex items-center gap-3">
+                        <UserRound className="text-emerald-500" size={22} />
+                        <div>
+                            <p className="text-2xl font-bold text-[var(--text-primary)]">{managerCount}</p>
+                            <p className="text-sm text-[var(--text-secondary)]">Store managers</p>
+                            <p className="text-xs text-[var(--text-muted)]">{activeCount} active staff</p>
                         </div>
-                        {todayAttendance.pendingLeaves > 0 && (
-                            <Badge variant="warning" dot>{todayAttendance.pendingLeaves} Pending</Badge>
-                        )}
                     </div>
-                    <p className="text-2xl font-bold text-[var(--text-primary)] mb-0.5">{todayAttendance.pendingLeaves}</p>
-                    <p className="text-sm text-[var(--text-secondary)]">Pending Leave Requests</p>
-                    <p className="text-xs text-[var(--text-muted)] mt-1">Requires review</p>
                 </Card>
             </div>
 
-            {/* ── Today's Attendance Overview ── */}
             <Card padding="md">
                 <Card.Header withBorder>
                     <div>
-                        <Card.Title>Today&apos;s Store Attendance Roster</Card.Title>
-                        <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                            Real-time check-in status across all assigned retail locations
+                        <Card.Title>Employee details</Card.Title>
+                        <p className="mt-1 text-xs text-[var(--text-muted)]">
+                            Employee accounts and assignments across your stores
                         </p>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1.5 text-xs">
-                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                            <span className="text-[var(--text-secondary)]">Present: <strong>{todayAttendance.present}</strong></span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-xs">
-                            <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-                            <span className="text-[var(--text-secondary)]">Absent: <strong>{todayAttendance.absent}</strong></span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-xs">
-                            <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                            <span className="text-[var(--text-secondary)]">On Leave: <strong>{todayAttendance.onLeave}</strong></span>
-                        </div>
-                    </div>
+                    <Badge variant="info">{filteredEmployees.length} employees</Badge>
                 </Card.Header>
                 <Card.Body>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
-                        {/* Present employees sample */}
-                        <div>
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-3 flex items-center gap-1.5">
-                                <UserCheck size={14} />
-                                Checked In Today
-                            </h3>
-                            <div className="space-y-2">
-                                {presentEmployees.map((e) => (
-                                    <div key={e.id} className="p-2.5 rounded-[var(--radius-control)] bg-[var(--surface-secondary)] flex items-center justify-between text-sm">
-                                        <div>
-                                            <p className="font-semibold text-[var(--text-primary)]">{e.name}</p>
-                                            <p className="text-xs text-[var(--text-muted)]">{e.role} • {e.store} Store</p>
-                                        </div>
-                                        <Badge variant="success">{e.inTime}</Badge>
-                                    </div>
-                                ))}
-                            </div>
+                    {loading && employees.length === 0 ? (
+                        <p className="py-8 text-center text-sm text-[var(--text-secondary)]">
+                            Loading store and employee details...
+                        </p>
+                    ) : filteredEmployees.length === 0 ? (
+                        <div className="py-8 text-center">
+                            <Users className="mx-auto mb-2 text-[var(--text-muted)]" size={28} />
+                            <p className="text-sm font-medium text-[var(--text-primary)]">
+                                {selectedStore === "all" ? "No employees have been added yet" : "No employees in this store"}
+                            </p>
+                            <Link
+                                to="/store-admin/employees"
+                                className="inline-block mt-3 text-sm font-semibold text-[var(--primary)] hover:underline"
+                            >
+                                Add an employee
+                            </Link>
                         </div>
-
-                        {/* Absent employees */}
-                        <div>
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-3 flex items-center gap-1.5">
-                                <UserX size={14} />
-                                Absent Employees
-                            </h3>
-                            <div className="space-y-2">
-                                {absentEmployees.map((e) => (
-                                    <div key={e.id} className="p-2.5 rounded-[var(--radius-control)] bg-[var(--surface-secondary)] flex items-center justify-between text-sm">
-                                        <div>
-                                            <p className="font-semibold text-[var(--text-primary)]">{e.name}</p>
-                                            <p className="text-xs text-[var(--text-muted)]">{e.role} • {e.store} Store</p>
-                                        </div>
-                                        <Badge variant="danger">{e.reason}</Badge>
-                                    </div>
-                                ))}
-                            </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full min-w-[900px] text-left text-sm">
+                                <thead>
+                                    <tr className="border-b border-[var(--border)] text-xs font-semibold uppercase text-[var(--text-secondary)]">
+                                        <th className="px-3 py-3">Employee</th>
+                                        <th className="px-3 py-3">Contact</th>
+                                        <th className="px-3 py-3">Date of birth</th>
+                                        <th className="px-3 py-3">Designation</th>
+                                        <th className="px-3 py-3">Store</th>
+                                        <th className="px-3 py-3">Salary</th>
+                                        <th className="px-3 py-3">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-[var(--border)]">
+                                    {filteredEmployees.map((employee) => {
+                                        const employeeName = employee.userId?.fullName || "Unnamed employee";
+                                        const storeName = employee.storeId?.name || "Unassigned";
+                                        return (
+                                            <tr key={employee._id} className="hover:bg-[var(--surface-secondary)]/50">
+                                                <td className="px-3 py-3">
+                                                    <p className="font-semibold text-[var(--text-primary)]">{employeeName}</p>
+                                                    <p className="text-xs text-[var(--text-muted)]">
+                                                        {employee.employeeCode || "No employee code"}
+                                                    </p>
+                                                </td>
+                                                <td className="px-3 py-3">
+                                                    <p className="inline-flex items-center gap-1.5 text-[var(--text-primary)]">
+                                                        <Mail size={13} /> {employee.userId?.email || "No email"}
+                                                    </p>
+                                                    <p className="mt-1 text-xs text-[var(--text-muted)]">
+                                                        {employee.userId?.mobile || "No phone"}
+                                                    </p>
+                                                </td>
+                                                <td className="px-3 py-3 text-[var(--text-secondary)]">
+                                                    {formatDate(employee.Dob)}
+                                                </td>
+                                                <td className="px-3 py-3 text-[var(--text-secondary)]">
+                                                    {employee.designation || "—"}
+                                                </td>
+                                                <td className="px-3 py-3">
+                                                    <p className="inline-flex items-center gap-1.5 text-[var(--text-primary)]">
+                                                        <MapPin size={13} /> {storeName}
+                                                    </p>
+                                                    {employee.organizationId?.name && (
+                                                        <p className="mt-1 text-xs text-[var(--text-muted)] inline-flex items-center gap-1">
+                                                            <Building2 size={12} /> {employee.organizationId.name}
+                                                        </p>
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-3 text-[var(--text-secondary)]">
+                                                    {formatSalary(employee.salary)}
+                                                </td>
+                                                <td className="px-3 py-3">
+                                                    <Badge variant={employee.status === "active" ? "success" : "warning"} dot>
+                                                        {employee.status || "unknown"}
+                                                    </Badge>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
                         </div>
-                    </div>
+                    )}
                 </Card.Body>
             </Card>
 
-            {/* ── Pending Leave Requests & Store Activities ── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Leave Requests */}
-                <Card padding="md">
-                    <Card.Header withBorder>
-                        <Card.Title className="flex items-center gap-2">
-                            <Clock size={16} className="text-amber-500" />
-                            Pending Leave Requests
-                        </Card.Title>
-                        <Badge variant="warning">{pendingLeaves.length} items</Badge>
-                    </Card.Header>
-                    <Card.Body className="space-y-3">
-                        {pendingLeaves.map((lv) => (
-                            <div key={lv.id} className="p-3 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface)] space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <p className="text-sm font-bold text-[var(--text-primary)]">{lv.name}</p>
-                                    <Badge variant="info">{lv.type}</Badge>
+            {stores.length > 0 && (
+                <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {stores.map((store) => (
+                        <Card key={store._id} padding="md">
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <h2 className="font-semibold text-[var(--text-primary)]">{store.name}</h2>
+                                    <p className="mt-1 text-xs text-[var(--text-muted)]">{store.code}</p>
                                 </div>
-                                <p className="text-xs text-[var(--text-secondary)]">
-                                    Branch: {lv.store} Store • Period: {lv.duration}
-                                </p>
-                                <p className="text-xs text-[var(--text-muted)] italic">
-                                    &ldquo;{lv.reason}&rdquo;
-                                </p>
-                                <div className="flex items-center justify-end gap-2 pt-1 border-t border-[var(--border)]">
-                                    <Button size="xs" variant="ghost" className="text-rose-500">
-                                        Decline
-                                    </Button>
-                                    <Button size="xs" variant="primary">
-                                        Approve
-                                    </Button>
-                                </div>
+                                <Badge variant={store.status === "active" ? "success" : "warning"} dot>
+                                    {store.status}
+                                </Badge>
                             </div>
-                        ))}
-                    </Card.Body>
-                </Card>
-
-                {/* Recent Activities */}
-                <Card padding="md">
-                    <Card.Header withBorder>
-                        <Card.Title>Recent Store Activities</Card.Title>
-                        <Link to="/store-admin/stores" className="text-xs text-[var(--primary)] font-semibold hover:underline">
-                            Stores List
-                        </Link>
-                    </Card.Header>
-                    <Card.Body>
-                        <div className="divide-y divide-[var(--border)]">
-                            {recentActivities.map((act) => (
-                                <div key={act.id} className="py-3 flex items-start gap-3 first:pt-0 last:pb-0">
-                                    <div className="w-8 h-8 rounded-lg bg-[var(--surface-secondary)] text-[var(--primary)] flex items-center justify-center shrink-0 mt-0.5">
-                                        <Building2 size={15} />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <p className="text-sm font-medium text-[var(--text-primary)]">{act.text}</p>
-                                        <p className="text-xs text-[var(--text-muted)] mt-0.5">{act.time}</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </Card.Body>
-                </Card>
-            </div>
+                            <p className="mt-3 inline-flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+                                <MapPin size={13} /> {store.address?.city || store.location?.address || "Location not set"}
+                            </p>
+                            <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                                {employees.filter((employee) => (employee.storeId?._id || employee.storeId) === store._id).length} staff assigned
+                            </p>
+                        </Card>
+                    ))}
+                </section>
+            )}
         </div>
     );
 }

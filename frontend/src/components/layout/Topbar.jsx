@@ -130,7 +130,7 @@ export default function Topbar() {
                     "h-16 flex items-center gap-4 px-4 sm:px-6",
                     "bg-[var(--surface)] border-b border-[var(--border)]",
                     "shadow-[var(--shadow-xs)]",
-                ].join(" ")}
+                ].join(" ")}    
             >
                 {/* ── Left ── */}
                 <div className="flex items-center gap-3 flex-1 min-w-0">

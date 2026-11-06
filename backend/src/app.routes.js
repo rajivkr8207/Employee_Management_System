@@ -8,6 +8,7 @@ import authRouter from './modules/user/user.route.js';
 import shiftRouter from './modules/shift/shift.route.js';
 import attendanceRouter from './modules/attendence/attendence.route.js';
 import leaveRouter from './modules/leave/leave.route.js';
+import adminRouter from './modules/admin/admin.route.js';
 
 const AllRoutes = express.Router();
 
@@ -20,5 +21,6 @@ AllRoutes.use('/shifts', shiftRouter);
 AllRoutes.use('/attendance', attendanceRouter);
 AllRoutes.use('/leaves', leaveRouter);
 AllRoutes.use('/auth', authRouter);
+AllRoutes.use('/admin', adminRouter);
 
 export { AllRoutes };

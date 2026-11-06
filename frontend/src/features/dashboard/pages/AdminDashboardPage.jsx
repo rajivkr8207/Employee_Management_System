@@ -10,9 +10,7 @@ import {
     ShieldCheck,
     ArrowRight,
     CheckCircle2,
-    XCircle,
     Activity,
-    AlertCircle,
     Sparkles,
 } from "lucide-react";
 import { fetchAdminDashboardStatsThunk } from "../../admin/adminSlice";
@@ -52,32 +50,45 @@ function StatCard({ title, value, sub, icon: Icon, iconBg, iconColor, badge, lin
 
 export default function AdminDashboardPage() {
     const dispatch = useDispatch();
-    const { stats } = useSelector((state) => state.admin);
+    const { stats, statsLoading, statsError } = useSelector((state) => state.admin);
 
     useEffect(() => {
         dispatch(fetchAdminDashboardStatsThunk());
     }, [dispatch]);
 
-    // Fallback data if loading or null
-    const s = stats || {
-        users: { total: 1248, verified: 1180, pending: 48, rejected: 20 },
-        stores: { total: 86, approved: 74, pending: 9, rejected: 3 },
-        managers: { total: 92, approved: 81, pending: 8, rejected: 3 },
-        recentRegistrations: [
-            { id: "reg_1", name: "Rohan Patel", role: "Employee", time: "10 mins ago", status: "pending" },
-            { id: "reg_2", name: "Ananya Sharma", role: "Store Manager", time: "45 mins ago", status: "pending" },
-            { id: "reg_3", name: "Apex Hypermarket", role: "Store", time: "2 hours ago", status: "pending" },
-            { id: "reg_4", name: "Vikram Malhotra", role: "Store Admin", time: "3 hours ago", status: "pending" },
-        ],
-        recentApprovals: [
-            { id: "app_1", subject: "Pooja Hegde (Store Admin)", action: "Approved", time: "1 hour ago", status: "approved" },
-            { id: "app_2", subject: "QuickMart Express - Indiranagar", action: "Approved", time: "3 hours ago", status: "approved" },
-            { id: "app_3", subject: "Metro Retail - CP", action: "Rejected", time: "Yesterday", status: "rejected", reason: "Expired NOC" },
-        ],
-    };
+    if (!stats) {
+        return (
+            <div className="space-y-6 animate-fade-in">
+                <div>
+                    <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)]">Admin Overview</h1>
+                    <p className="text-sm text-[var(--text-secondary)] mt-1">
+                        Manage every user, store, manager, and employee across the system
+                    </p>
+                </div>
+                {statsError ? (
+                    <div role="alert" className="flex items-center justify-between gap-4 rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-[var(--text-primary)]">
+                        <span>{statsError}</span>
+                        <Button variant="outline" size="sm" onClick={() => dispatch(fetchAdminDashboardStatsThunk())}>
+                            Retry
+                        </Button>
+                    </div>
+                ) : (
+                    <Card className="text-sm text-[var(--text-muted)]">
+                        {statsLoading ? "Loading dashboard..." : "Dashboard data is not available."}
+                    </Card>
+                )}
+            </div>
+        );
+    }
 
-    const userVerifyPct = Math.round((s.users.verified / (s.users.total || 1)) * 100);
-    const storeApprovePct = Math.round((s.stores.approved / (s.stores.total || 1)) * 100);
+    const s = stats;
+
+    const userVerifyPct = s.users.total
+        ? Math.round((s.users.verified / s.users.total) * 100)
+        : 0;
+    const storeActivePct = s.stores.total
+        ? Math.round((s.stores.active / s.stores.total) * 100)
+        : 0;
     const managerApprovePct = Math.round((s.managers.approved / (s.managers.total || 1)) * 100);
 
     return (
@@ -95,7 +106,7 @@ export default function AdminDashboardPage() {
                         </span>
                     </div>
                     <p className="text-sm text-[var(--text-secondary)] mt-1">
-                        System-level verification, store authorization, and live governance metrics
+                        Manage every user, store, manager, and employee across the system
                     </p>
                 </div>
 
@@ -106,12 +117,26 @@ export default function AdminDashboardPage() {
                         </Button>
                     </Link>
                     <Link to="/admin/store-verification">
+                        <Button variant="outline" size="sm" icon={Store}>
+                            Verify Stores ({s.stores.pending})
+                        </Button>
+                    </Link>
+                    <Link to="/admin/stores">
                         <Button variant="primary" size="sm" icon={Store}>
-                            Approve Stores ({s.stores.pending})
+                            View Stores ({s.stores.total})
                         </Button>
                     </Link>
                 </div>
             </div>
+
+            {statsError && (
+                <div role="alert" className="flex items-center justify-between gap-4 rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-[var(--text-primary)]">
+                    <span>{statsError}</span>
+                    <Button variant="outline" size="sm" onClick={() => dispatch(fetchAdminDashboardStatsThunk())}>
+                        Retry
+                    </Button>
+                </div>
+            )}
 
             {/* ── Section 1: User Verification Stats ── */}
             <div>
@@ -153,64 +178,64 @@ export default function AdminDashboardPage() {
                         linkTo="/admin/user-verification"
                     />
                     <StatCard
-                        title="Rejected Users"
-                        value={s.users.rejected}
-                        sub="Declined applications"
+                        title="Blocked Users"
+                        value={s.users.blocked}
+                        sub="Blocked accounts"
                         icon={UserX}
                         iconBg="var(--danger-soft)"
                         iconColor="var(--danger)"
-                        linkTo="/admin/user-verification"
+                        linkTo="/admin/users"
                     />
                 </div>
             </div>
 
-            {/* ── Section 2: Store Verification Stats ── */}
+            {/* ── Section 2: Directory Totals ── */}
             <div>
                 <div className="flex items-center justify-between mb-3">
                     <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                        Store Approvals & Facilities
+                        Store and Employee Directory
                     </h2>
-                    <Link to="/admin/store-verification" className="text-xs font-semibold text-[var(--primary)] hover:underline flex items-center gap-1">
-                        Review Stores <ArrowRight size={12} />
+                    <Link to="/admin/stores" className="text-xs font-semibold text-[var(--primary)] hover:underline flex items-center gap-1">
+                        View Stores <ArrowRight size={12} />
                     </Link>
                 </div>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     <StatCard
                         title="Total Stores"
                         value={s.stores.total}
-                        sub="Enterprise locations"
+                        sub="Across all organizations"
                         icon={Store}
                         iconBg="var(--info-soft)"
                         iconColor="var(--info)"
                         linkTo="/admin/stores"
                     />
                     <StatCard
-                        title="Approved Stores"
-                        value={s.stores.approved}
-                        sub="Active & operational"
+                        title="Active Stores"
+                        value={s.stores.active}
+                        sub={`${storeActivePct}% of all stores`}
                         icon={CheckCircle2}
                         iconBg="var(--success-soft)"
                         iconColor="var(--success)"
-                        linkTo="/admin/store-verification"
+                        linkTo="/admin/stores"
                     />
                     <StatCard
-                        title="Pending Approvals"
+                        title="Pending Store Approval"
                         value={s.stores.pending}
-                        sub="Submitted for validation"
-                        icon={AlertCircle}
+                        sub="Awaiting administrator review"
+                        icon={Clock}
                         iconBg="var(--warning-soft)"
                         iconColor="var(--warning)"
-                        badge={s.stores.pending > 0 ? `${s.stores.pending} Stores` : null}
+                        badge={s.stores.pending > 0 ? "Action Required" : null}
                         linkTo="/admin/store-verification"
                     />
                     <StatCard
-                        title="Rejected Stores"
-                        value={s.stores.rejected}
-                        sub="Incomplete documents"
-                        icon={XCircle}
-                        iconBg="var(--danger-soft)"
-                        iconColor="var(--danger)"
-                        linkTo="/admin/store-verification"
+                        title="Total Employees"
+                        value={s.employees.total}
+                        sub={`${s.employees.active} active`}
+                        icon={Users}
+                        iconBg="var(--primary-soft)"
+                        iconColor="var(--primary)"
+                        linkTo="/admin/employees"
                     />
                 </div>
             </div>
@@ -284,16 +309,16 @@ export default function AdminDashboardPage() {
                             <div className="flex justify-between text-xs font-medium mb-1.5">
                                 <span className="text-[var(--text-primary)] font-semibold flex items-center gap-1.5">
                                     <Store size={13} className="text-emerald-500" />
-                                    Store Approval Rate
+                                    Active Store Rate
                                 </span>
                                 <span className="text-[var(--text-secondary)]">
-                                    {s.stores.approved} / {s.stores.total} ({storeApprovePct}%)
+                                    {s.stores.active} / {s.stores.total} ({storeActivePct}%)
                                 </span>
                             </div>
                             <div className="w-full h-2.5 rounded-full bg-[var(--surface-secondary)] overflow-hidden">
                                 <div
                                     className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-                                    style={{ width: `${storeApprovePct}%` }}
+                                    style={{ width: `${storeActivePct}%` }}
                                 />
                             </div>
                         </div>
@@ -320,7 +345,7 @@ export default function AdminDashboardPage() {
                 </Card>
             </div>
 
-            {/* ── Section 4: Live Activities Feeds ── */}
+            {/* ── Section 4: Recent registrations and directories ── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Recent Registrations */}
                 <Card padding="md">
@@ -339,55 +364,64 @@ export default function AdminDashboardPage() {
                                 <div key={item.id} className="py-3 flex items-center justify-between gap-3 first:pt-0 last:pb-0">
                                     <div className="flex items-center gap-3 min-w-0">
                                         <div className="w-8 h-8 rounded-full bg-[var(--surface-secondary)] flex items-center justify-center font-bold text-xs text-[var(--text-primary)] shrink-0">
-                                            {item.name[0]}
+                                            {(item.name || "?")[0]}
                                         </div>
                                         <div className="min-w-0">
                                             <p className="text-sm font-semibold text-[var(--text-primary)] truncate">
                                                 {item.name}
                                             </p>
                                             <p className="text-xs text-[var(--text-muted)] truncate">
-                                                Role: {item.role} • {item.time}
+                                                Role: {item.role} • {item.time ? new Date(item.time).toLocaleDateString() : "—"}
                                             </p>
                                         </div>
                                     </div>
-                                    <Badge variant={item.status === "verified" ? "success" : "warning"} dot>
+                                    <Badge
+                                        variant={item.status === "active" ? "success" : item.status === "blocked" ? "danger" : "warning"}
+                                        dot
+                                    >
                                         {item.status}
                                     </Badge>
                                 </div>
                             ))}
+                            {!s.recentRegistrations.length && !statsLoading && (
+                                <p className="py-6 text-center text-sm text-[var(--text-muted)]">No registrations found.</p>
+                            )}
+                            {statsLoading && (
+                                <p className="py-6 text-center text-sm text-[var(--text-muted)]">Loading registrations...</p>
+                            )}
                         </div>
                     </Card.Body>
                 </Card>
 
-                {/* Recent Approvals & Actions */}
+                {/* Directory shortcuts */}
                 <Card padding="md">
                     <Card.Header withBorder>
                         <Card.Title className="flex items-center gap-2">
-                            <CheckCircle2 size={16} className="text-emerald-500" />
-                            Recent Approval Activities
+                            <Users size={16} className="text-[var(--primary)]" />
+                            System Directories
                         </Card.Title>
-                        <Link to="/admin/activity-logs" className="text-xs text-[var(--primary)] font-semibold hover:underline">
-                            Activity Log
-                        </Link>
                     </Card.Header>
-                    <Card.Body>
-                        <div className="divide-y divide-[var(--border)]">
-                            {s.recentApprovals.map((item) => (
-                                <div key={item.id} className="py-3 flex items-center justify-between gap-3 first:pt-0 last:pb-0">
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-semibold text-[var(--text-primary)] truncate">
-                                            {item.subject}
-                                        </p>
-                                        <p className="text-xs text-[var(--text-muted)] mt-0.5 truncate">
-                                            {item.action} • {item.time}
-                                            {item.reason && ` (Reason: ${item.reason})`}
-                                        </p>
-                                    </div>
-                                    <Badge variant={item.status === "approved" ? "success" : "danger"}>
-                                        {item.status}
-                                    </Badge>
-                                </div>
-                            ))}
+                    <Card.Body className="space-y-3">
+                        <div className="flex items-center justify-between gap-4 rounded-lg bg-[var(--surface-secondary)] p-3">
+                            <div>
+                                <p className="text-sm font-semibold text-[var(--text-primary)]">All users</p>
+                                <p className="text-xs text-[var(--text-muted)]">{s.users.total.toLocaleString()} accounts</p>
+                            </div>
+                            <Link to="/admin/users" className="text-xs font-semibold text-[var(--primary)] hover:underline">Open directory</Link>
+                        </div>
+                        <div className="flex items-center justify-between gap-4 rounded-lg bg-[var(--surface-secondary)] p-3">
+                            <div>
+                                <p className="text-sm font-semibold text-[var(--text-primary)]">All stores</p>
+                                <p className="text-xs text-[var(--text-muted)]">{s.stores.total.toLocaleString()} locations</p>
+                            </div>
+                            <Link to="/admin/stores" className="text-xs font-semibold text-[var(--primary)] hover:underline">Open directory</Link>
+                        </div>
+                        <div className="flex items-center justify-between gap-4 rounded-lg bg-[var(--surface-secondary)] p-3">
+                            <div>
+                                <p className="text-sm font-semibold text-[var(--text-primary)]">All employees</p>
+                                <p className="text-xs text-[var(--text-muted)]">{s.employees.total.toLocaleString()} people</p>
+                            </div>
+                            <Link to="/admin/employees" className="text-xs font-semibold text-[var(--primary)] hover:underline">Open directory</Link>
                         </div>
                     </Card.Body>
                 </Card>

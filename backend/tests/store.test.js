@@ -13,10 +13,18 @@ jest.unstable_mockModule('../src/config/redis.js', () => ({
   },
 }));
 
+jest.unstable_mockModule('../src/services/mail.service.js', () => ({
+  MailService: class {
+    async SendStaffCredentialsMail() {}
+  },
+}));
+
 const { app } = await import('../src/app.js');
 const { default: UserModel } = await import('../src/modules/user/user.model.js');
 const { organizationModel } = await import('../src/modules/organization/organization.model.js');
 const { StoreModel } = await import('../src/modules/store/store.model.js');
+const { MembershipModel } = await import('../src/modules/membership/membership.model.js');
+const { EmployeeModel } = await import('../src/modules/employee/employee.model.js');
 const { connectTestDB, closeTestDB, clearTestDB } = await import('./setup.js');
 
 const createUser = async ({ username, role = ROLES.STORE_ADMIN }) => {
@@ -92,7 +100,15 @@ describe('Store API', () => {
       expect(res.body.data.store.code).toBe(storeDetails.code);
       expect(res.body.data.store.organizationId).toBe(organization.id);
       expect(res.body.data.store.createdBy).toBe(user.id);
+      expect(res.body.data.store.status).toBe('inactive');
+      expect(res.body.data.store.verificationStatus).toBe('pending');
       expect(await StoreModel.countDocuments({ createdBy: user.id })).toBe(1);
+
+      const secondStore = await request(app)
+        .post('/api/v1/stores')
+        .set('Cookie', `accessToken=${token}`)
+        .send({ ...storeDetails, code: 'DOWNTOWN-02' });
+      expect(secondStore.statusCode).toBe(409);
     });
 
     it('rejects invalid store details and creation without an approved organization', async () => {
@@ -131,6 +147,137 @@ describe('Store API', () => {
   });
 
   describe('Store management', () => {
+    it('lets a manager view only assigned stores without store-admin permissions', async () => {
+      const { user: owner } = await createUser({ username: 'managerstoreowner' });
+      const { user: otherOwner } = await createUser({ username: 'managerstoreotherowner' });
+      const { user: manager, token } = await createUser({
+        username: 'assignedmanager',
+        role: ROLES.MANAGER,
+      });
+      const organization = await createApprovedOrganization(owner.id, 'managerorg@example.com');
+      const otherOrganization = await createApprovedOrganization(
+        otherOwner.id,
+        'managerotherorg@example.com',
+      );
+      const [assignedStore, otherStore] = await Promise.all([
+        StoreModel.create({
+          ...storeDetails,
+          code: 'MANAGER-ASSIGNED',
+          organizationId: organization.id,
+          createdBy: owner.id,
+        }),
+        StoreModel.create({
+          ...storeDetails,
+          code: 'MANAGER-OTHER',
+          organizationId: otherOrganization.id,
+          createdBy: otherOwner.id,
+        }),
+      ]);
+      assignedStore.managerId = manager.id;
+      await assignedStore.save();
+      await MembershipModel.create({
+        userId: manager.id,
+        organizationId: organization.id,
+        storeIds: [assignedStore.id],
+        role: 'manager',
+        status: 'active',
+      });
+
+      const list = await request(app)
+        .get('/api/v1/stores')
+        .set('Cookie', `accessToken=${token}`);
+      expect(list.statusCode).toBe(200);
+      expect(list.body.data.stores.map((store) => store._id)).toEqual([assignedStore.id]);
+
+      const forbiddenCreate = await request(app)
+        .post('/api/v1/stores')
+        .set('Cookie', `accessToken=${token}`)
+        .send(storeDetails);
+      expect(forbiddenCreate.statusCode).toBe(403);
+      expect(await StoreModel.exists({ _id: otherStore.id })).not.toBeNull();
+    });
+
+    it('lets store administrators create, manage, and remove managers who can log in', async () => {
+      const { user: owner, token: ownerToken } = await createUser({
+        username: 'managerworkflowowner',
+      });
+      const organization = await createApprovedOrganization(owner.id, 'managerworkflow@example.com');
+      const store = await StoreModel.create({
+        ...storeDetails,
+        organizationId: organization.id,
+        createdBy: owner.id,
+      });
+      const managerCredentials = {
+        fullName: 'Assigned Store Manager',
+        username: 'assignedmanagerlogin',
+        email: 'assignedmanagerlogin@example.com',
+        password: 'Password123',
+      };
+
+      const created = await request(app)
+        .post(`/api/v1/stores/${store.id}/managers`)
+        .set('Cookie', `accessToken=${ownerToken}`)
+        .send(managerCredentials);
+      expect(created.statusCode).toBe(201);
+      expect(created.body.data.manager.role).toBe(ROLES.MANAGER);
+      expect(created.body.data.store._id).toBe(store.id);
+      const managerId = created.body.data.manager._id;
+
+      const listed = await request(app)
+        .get(`/api/v1/stores/${store.id}/managers`)
+        .set('Cookie', `accessToken=${ownerToken}`);
+      expect(listed.statusCode).toBe(200);
+      expect(listed.body.data.managers).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            _id: managerId,
+            fullName: managerCredentials.fullName,
+            isActive: true,
+            membershipStatus: 'active',
+          }),
+        ]),
+      );
+
+      const login = await request(app).post('/api/v1/auth/login').send({
+        identifier: managerCredentials.username,
+        password: managerCredentials.password,
+      });
+      expect(login.statusCode).toBe(200);
+      expect(login.body.data.user.role).toBe(ROLES.MANAGER);
+
+      const deactivated = await request(app)
+        .patch(`/api/v1/stores/${store.id}/managers/${managerId}`)
+        .set('Cookie', `accessToken=${ownerToken}`)
+        .send({ isActive: false });
+      expect(deactivated.statusCode).toBe(200);
+      expect(deactivated.body.data.isActive).toBe(false);
+
+      const blockedLogin = await request(app).post('/api/v1/auth/login').send({
+        identifier: managerCredentials.username,
+        password: managerCredentials.password,
+      });
+      expect(blockedLogin.statusCode).toBe(403);
+
+      const reactivated = await request(app)
+        .patch(`/api/v1/stores/${store.id}/managers/${managerId}`)
+        .set('Cookie', `accessToken=${ownerToken}`)
+        .send({ isActive: true });
+      expect(reactivated.statusCode).toBe(200);
+
+      const removed = await request(app)
+        .delete(`/api/v1/stores/${store.id}/managers/${managerId}`)
+        .set('Cookie', `accessToken=${ownerToken}`);
+      expect(removed.statusCode).toBe(200);
+      expect(await EmployeeModel.exists({ userId: managerId, status: 'terminated' })).not.toBeNull();
+      expect(await MembershipModel.exists({ userId: managerId, storeIds: store.id })).toBeNull();
+
+      const removedManagerLogin = await request(app).post('/api/v1/auth/login').send({
+        identifier: managerCredentials.username,
+        password: managerCredentials.password,
+      });
+      expect(removedManagerLogin.statusCode).toBe(403);
+    });
+
     it('lists, fetches, updates, and deletes the owner’s store', async () => {
       const { user, token } = await createUser({ username: 'managementowner' });
       const organization = await createApprovedOrganization(user.id, 'manageorg@example.com');

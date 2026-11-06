@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import Config from '../config/Config.js';
+import Config from '../config/config.js';
 import { ROLES } from '../constants/roles.js';
 import User from '../modules/user/user.model.js';
 import { ApiError } from '../utils/ApiError.js';

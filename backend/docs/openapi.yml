@@ -16,6 +16,7 @@ tags:
   - name: Authentication
   - name: Organizations
   - name: Stores
+  - name: Admin
 paths:
   /health:
     get:
@@ -911,6 +912,215 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /admin/dashboard/stats:
+    get:
+      tags: [Admin]
+      summary: Get system-wide dashboard counts
+      operationId: getAdminDashboardStats
+      security:
+        - accessCookie: []
+      description: Administrator-only totals for users, stores, employees, managers, and recent registrations.
+      responses:
+        '200':
+          description: Dashboard statistics fetched
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          users:
+                            type: object
+                            properties:
+                              total:
+                                type: integer
+                              verified:
+                                type: integer
+                              pending:
+                                type: integer
+                              blocked:
+                                type: integer
+                              active:
+                                type: integer
+                          stores:
+                            type: object
+                            properties:
+                              total:
+                                type: integer
+                              active:
+                                type: integer
+                              inactive:
+                                type: integer
+                          employees:
+                            type: object
+                            properties:
+                              total:
+                                type: integer
+                              active:
+                                type: integer
+                              inactive:
+                                type: integer
+                          managers:
+                            type: object
+                            properties:
+                              total:
+                                type: integer
+                              approved:
+                                type: integer
+                              pending:
+                                type: integer
+                          recentRegistrations:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  $ref: '#/components/schemas/ObjectId'
+                                name:
+                                  type: string
+                                role:
+                                  type: string
+                                time:
+                                  type: string
+                                  format: date-time
+                                status:
+                                  type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/users:
+    get:
+      tags: [Admin]
+      summary: List all system users
+      operationId: listAdminUsers
+      security:
+        - accessCookie: []
+      description: Administrator-only directory. Account credentials and token fields are excluded.
+      responses:
+        '200':
+          description: Users fetched
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          users:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/stores:
+    get:
+      tags: [Admin]
+      summary: List all stores
+      operationId: listAdminStores
+      security:
+        - accessCookie: []
+      description: Administrator-only directory with organization, manager, and employee-count summaries.
+      responses:
+        '200':
+          description: Stores fetched
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          stores:
+                            type: array
+                            items:
+                              allOf:
+                                - $ref: '#/components/schemas/Store'
+                                - type: object
+                                  properties:
+                                    employeeCount:
+                                      type: integer
+                                    organizationId:
+                                      type: object
+                                      properties:
+                                        name:
+                                          type: string
+                                    managerId:
+                                      type: object
+                                      properties:
+                                        fullName:
+                                          type: string
+                                        email:
+                                          type: string
+                                          format: email
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/employees:
+    get:
+      tags: [Admin]
+      summary: List all employees and store managers
+      operationId: listAdminEmployees
+      security:
+        - accessCookie: []
+      description: Administrator-only directory with employee, store, and organization summaries.
+      responses:
+        '200':
+          description: Employees fetched
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          employees:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                _id:
+                                  $ref: '#/components/schemas/ObjectId'
+                                employeeCode:
+                                  type: string
+                                designation:
+                                  type: string
+                                status:
+                                  type: string
+                                  enum: [active, inactive, terminated]
+                                userId:
+                                  $ref: '#/components/schemas/User'
+                                storeId:
+                                  $ref: '#/components/schemas/Store'
+                                organizationId:
+                                  type: object
+                                  properties:
+                                    name:
+                                      type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
 components:
   securitySchemes:
     accessCookie:
@@ -1251,7 +1461,14 @@ components:
         _id:
           $ref: '#/components/schemas/ObjectId'
         organizationId:
-          $ref: '#/components/schemas/ObjectId'
+          oneOf:
+            - $ref: '#/components/schemas/ObjectId'
+            - type: object
+              properties:
+                _id:
+                  $ref: '#/components/schemas/ObjectId'
+                name:
+                  type: string
         name:
           type: string
         code:

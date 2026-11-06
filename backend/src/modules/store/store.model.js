@@ -32,6 +32,10 @@ const storeSchema = new mongoose.Schema(
       lng: { type: Number, required: true },
       radius: { type: Number, default: 100 }, // metres
     },
+    timeZone: {
+      type: String,
+      default: 'Asia/Kolkata',
+    },
     managerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -41,6 +45,26 @@ const storeSchema = new mongoose.Schema(
       type: String,
       enum: ['active', 'inactive'],
       default: 'active',
+    },
+    verificationStatus: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'approved',
+      index: true,
+    },
+    rejectionReason: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    reviewedAt: {
+      type: Date,
+      default: null,
     },
 
     createdBy: {
@@ -53,5 +77,6 @@ const storeSchema = new mongoose.Schema(
 );
 
 storeSchema.index({ code: 1 }, { unique: true });
+storeSchema.index({ createdBy: 1 }, { unique: true });
 
 export const StoreModel = mongoose.model('Store', storeSchema);

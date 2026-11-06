@@ -1,6 +1,6 @@
 import { ApiResponse } from '../../utils/ApiResponse.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
-import { createEmployee, getEmployee, listEmployees } from './employee.service.js';
+import { createEmployee, getEmployee, getMyEmployee, listEmployees } from './employee.service.js';
 
 export const addEmployee = asyncHandler(async (req, res) => {
   const employee = await createEmployee(req.body, req.user.id);
@@ -25,4 +25,11 @@ export const getEmployeeById = asyncHandler(async (req, res) => {
     employeeId: req.params.employeeId,
   });
   return res.status(200).json(new ApiResponse(200, { employee }, 'Employee fetched successfully'));
+});
+
+export const getMyEmployeeProfile = asyncHandler(async (req, res) => {
+  const employee = await getMyEmployee(req.user.id);
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { employee }, 'Employee profile fetched successfully'));
 });

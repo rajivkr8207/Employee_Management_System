@@ -7,9 +7,11 @@ import StoreAdminInvitation from './store-admin-invitation.model.js';
 import crypto from 'crypto';
 import { URL } from 'node:url';
 import { ROLES } from '../../constants/roles.js';
+import { createFaceProfileData } from './face.service.js';
 
 export const registerUser = async (registrationData) => {
-  const { token, fullName, username, password, mobile } = registrationData;
+  const { token, fullName, username, password, mobile, avatarBuffer, avatarMimeType } =
+    registrationData;
 
   // Direct open self-registration without invitation is disabled
   if (!token) {
@@ -20,7 +22,15 @@ export const registerUser = async (registrationData) => {
   }
 
   // If token is provided, complete store administrator onboarding
-  return registerStoreAdmin({ token, fullName, username, password, mobile });
+  return registerStoreAdmin({
+    token,
+    fullName,
+    username,
+    password,
+    mobile,
+    avatarBuffer,
+    avatarMimeType,
+  });
 };
 
 export const createStoreAdminInvitation = async (email, invitedBy) => {
@@ -97,6 +107,8 @@ export const registerStoreAdmin = async ({
   username,
   password,
   mobile,
+  avatarBuffer,
+  avatarMimeType,
 }) => {
   username = username.trim().toLowerCase();
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
@@ -117,16 +129,22 @@ export const registerStoreAdmin = async ({
     throw new ApiError(409, 'User with this email, username, or mobile already exists');
   }
 
+  const faceProfile = avatarBuffer
+    ? await createFaceProfileData({ imageBuffer: avatarBuffer, contentType: avatarMimeType })
+    : {};
   const user = await User.create({
     fullName,
     username,
     email: invitation.email,
     password,
     ...(mobile ? { mobile } : {}),
+    ...faceProfile,
+    ...(faceProfile.faceEmbedding ? { faceEnrolledAt: new Date() } : {}),
     role: ROLES.STORE_ADMIN,
     provider: 'local',
     isVerified: true,
     isApproved: false,
+    approvalStatus: 'pending',
     isActive: true,
   });
 
@@ -139,14 +157,24 @@ export const registerStoreAdmin = async ({
 };
 
 export const listPendingStoreAdmins = async () =>
-  User.find({ role: ROLES.STORE_ADMIN, isApproved: false }).select(
-    'fullName username email mobile createdAt',
-  );
+  User.find({
+    role: ROLES.STORE_ADMIN,
+    isApproved: false,
+    isActive: true,
+    $or: [{ approvalStatus: 'pending' }, { approvalStatus: null }],
+  }).select('fullName username email mobile approvalStatus createdAt');
 
 export const approveStoreAdmin = async (id) => {
   const user = await User.findOneAndUpdate(
     { _id: id, role: ROLES.STORE_ADMIN, isApproved: false },
-    { $set: { isApproved: true } },
+    {
+      $set: {
+        isApproved: true,
+        isActive: true,
+        approvalStatus: 'approved',
+        rejectionReason: null,
+      },
+    },
     { new: true, runValidators: true },
   );
   if (!user) {
@@ -159,6 +187,25 @@ export const approveStoreAdmin = async (id) => {
     console.error('[Approval Mail Error]:', err.message);
   }
 
+  return { user };
+};
+
+export const rejectStoreAdmin = async (id, reason) => {
+  const user = await User.findOneAndUpdate(
+    { _id: id, role: ROLES.STORE_ADMIN, isApproved: false },
+    {
+      $set: {
+        isApproved: false,
+        isActive: false,
+        approvalStatus: 'rejected',
+        rejectionReason: reason,
+      },
+    },
+    { new: true, runValidators: true },
+  );
+  if (!user) {
+    throw new ApiError(404, 'Pending store administrator was not found');
+  }
   return { user };
 };
 

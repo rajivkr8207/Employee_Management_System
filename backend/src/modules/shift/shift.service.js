@@ -2,6 +2,8 @@ import { ApiError } from '../../utils/ApiError.js';
 import { authorizeOrganizationAccess } from '../membership/membership.service.js';
 import { StoreModel } from '../store/store.model.js';
 import { ShiftModel } from './shift.model.js';
+import { ShiftAssignmentModel } from './shift-assignment.model.js';
+import { EmployeeModel } from '../employee/employee.model.js';
 
 const populateShift = (query) =>
   query.populate('organizationId', 'name').populate('storeId', 'name code');
@@ -33,6 +35,84 @@ const ensureUniqueShiftName = async ({ storeId, name, excludedShiftId }) => {
   if (await ShiftModel.exists(query)) {
     throw new ApiError(409, 'A shift with this name already exists in the store');
   }
+};
+
+const populateAssignment = (query) =>
+  query
+    .populate({
+      path: 'employeeId',
+      select: 'employeeCode designation status userId',
+      populate: { path: 'userId', select: 'fullName username email mobile' },
+    })
+    .populate('shiftId', 'name startTime endTime status')
+    .populate('storeId', 'name code');
+
+export const listShiftAssignments = async ({ userId, organizationId, storeId, date }) => {
+  const { allowedStoreIds } = await authorizeOrganizationAccess({
+    userId,
+    organizationId,
+    storeId,
+    allowedRoles: ['owner', 'store_admin', 'manager'],
+  });
+  const query = { organizationId };
+  if (storeId) query.storeId = storeId;
+  else if (allowedStoreIds) query.storeId = { $in: allowedStoreIds };
+  if (date) query.date = date;
+  return populateAssignment(ShiftAssignmentModel.find(query).sort({ date: 1, createdAt: 1 }));
+};
+
+export const createShiftAssignment = async (assignmentData, userId) => {
+  const { organizationId, storeId, employeeId, shiftId, date } = assignmentData;
+  await authorizeOrganizationAccess({
+    userId,
+    organizationId,
+    storeId,
+    allowedRoles: ['owner', 'store_admin', 'manager'],
+  });
+  const [store, employee, shift] = await Promise.all([
+    StoreModel.exists({ _id: storeId, organizationId, status: 'active' }),
+    EmployeeModel.exists({
+      _id: employeeId,
+      organizationId,
+      storeId,
+      status: 'active',
+    }),
+    ShiftModel.exists({ _id: shiftId, organizationId, storeId, status: 'active' }),
+  ]);
+  if (!store) throw new ApiError(400, 'Schedules can only be assigned in an active store');
+  if (!employee) throw new ApiError(404, 'Active employee was not found in this store');
+  if (!shift) throw new ApiError(404, 'Active shift was not found in this store');
+
+  try {
+    const assignment = await ShiftAssignmentModel.create({
+      organizationId,
+      storeId,
+      employeeId,
+      shiftId,
+      date,
+      createdBy: userId,
+    });
+    return populateAssignment(ShiftAssignmentModel.findById(assignment._id));
+  } catch (error) {
+    if (error.code === 11000) {
+      throw new ApiError(409, 'This employee already has a scheduled shift for this date');
+    }
+    throw error;
+  }
+};
+
+export const deleteShiftAssignment = async ({ userId, organizationId, assignmentId }) => {
+  const assignment = await ShiftAssignmentModel.findOne({ _id: assignmentId, organizationId })
+    .select('storeId')
+    .lean();
+  if (!assignment) throw new ApiError(404, 'Shift assignment was not found');
+  await authorizeOrganizationAccess({
+    userId,
+    organizationId,
+    storeId: assignment.storeId,
+    allowedRoles: ['owner', 'store_admin', 'manager'],
+  });
+  await ShiftAssignmentModel.deleteOne({ _id: assignmentId, organizationId });
 };
 
 export const createShift = async (shiftData, userId) => {

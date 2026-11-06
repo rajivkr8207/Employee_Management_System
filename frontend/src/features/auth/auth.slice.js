@@ -1,23 +1,11 @@
 import { createSlice } from "@reduxjs/toolkit";
 import { loginThunk, registerThunk, fetchProfileThunk, updateProfileThunk, logoutThunk } from "./auth.thunk";
 
-/* ── helper: parse token expiry ── */
-function getStoredUser() {
-    try {
-        const raw = localStorage.getItem("ems_user");
-        return raw ? JSON.parse(raw) : null;
-    } catch {
-        return null;
-    }
-}
-
-const storedUser  = getStoredUser();
-const storedToken = localStorage.getItem("ems_token");
-
 const initialState = {
-    user:            storedUser,
-    token:           storedToken,
-    isAuthenticated: !!storedToken,
+    user: null,
+    token: null,
+    isAuthenticated: false,
+    isInitializing: true,
 
     /* per-action status */
     loginStatus:         "idle",   // idle | loading | succeeded | failed
@@ -35,13 +23,14 @@ const authSlice = createSlice({
     name: "auth",
     initialState,
     reducers: {
-        /* Manual logout without a thunk */
+        setAccessToken(state, { payload }) {
+            state.token = payload;
+        },
         clearAuth(state) {
-            state.user            = null;
-            state.token           = null;
+            state.user = null;
+            state.token = null;
             state.isAuthenticated = false;
-            localStorage.removeItem("ems_token");
-            localStorage.removeItem("ems_user");
+            state.isInitializing = false;
         },
         clearErrors(state) {
             state.loginError         = null;
@@ -64,8 +53,8 @@ const authSlice = createSlice({
                 state.user            = user;
                 state.token           = token || state.token;
                 state.isAuthenticated = !!(user || token || state.token);
-                if (token) localStorage.setItem("ems_token", token);
-                if (user) localStorage.setItem("ems_user",  JSON.stringify(user));
+                if (user) state.profileStatus = "succeeded";
+                state.isInitializing = false;
             })
             .addCase(loginThunk.rejected, (state, { payload }) => {
                 state.loginStatus = "failed";
@@ -86,9 +75,8 @@ const authSlice = createSlice({
                 if (token) {
                     state.token = token;
                     state.isAuthenticated = true;
-                    localStorage.setItem("ems_token", token);
                 }
-                if (user) localStorage.setItem("ems_user",  JSON.stringify(user));
+                state.isInitializing = false;
             })
             .addCase(registerThunk.rejected, (state, { payload }) => {
                 state.registerStatus = "failed";
@@ -103,15 +91,17 @@ const authSlice = createSlice({
             })
             .addCase(fetchProfileThunk.fulfilled, (state, { payload }) => {
                 state.profileStatus = "succeeded";
-                const user = payload?.user || (payload?._id ? payload : payload);
+                const user = payload?.user || payload;
                 if (user && typeof user === "object") {
                     state.user = user;
-                    localStorage.setItem("ems_user", JSON.stringify(user));
+                    state.isAuthenticated = true;
                 }
+                state.isInitializing = false;
             })
             .addCase(fetchProfileThunk.rejected, (state, { payload }) => {
                 state.profileStatus = "failed";
                 state.profileError  = payload;
+                state.isInitializing = false;
             });
 
         /* ── Update Profile ── */
@@ -122,10 +112,9 @@ const authSlice = createSlice({
             })
             .addCase(updateProfileThunk.fulfilled, (state, { payload }) => {
                 state.updateProfileStatus = "succeeded";
-                const user = payload?.user || (payload?._id ? payload : payload);
+                const user = payload?.user || payload;
                 if (user && typeof user === "object") {
                     state.user = user;
-                    localStorage.setItem("ems_user", JSON.stringify(user));
                 }
             })
             .addCase(updateProfileThunk.rejected, (state, { payload }) => {
@@ -141,12 +130,10 @@ const authSlice = createSlice({
                 state.isAuthenticated = false;
                 state.loginStatus     = "idle";
                 state.registerStatus  = "idle";
-                localStorage.removeItem("ems_token");
-                localStorage.removeItem("ems_user");
+                state.isInitializing = false;
             });
     },
 });
 
-export const { clearAuth, clearErrors } = authSlice.actions;
+export const { setAccessToken, clearAuth, clearErrors } = authSlice.actions;
 export default authSlice.reducer;
-

@@ -15,7 +15,9 @@ import {
   registerStoreAdmin,
   listPendingStoreAdmins,
   approveStoreAdmin,
+  rejectStoreAdmin,
 } from './user.service.js';
+import { enrollUserFace } from './face.service.js';
 
 const cookieOptions = {
   httpOnly: true,
@@ -35,13 +37,14 @@ const cookieClearOptions = {
 // ─────────────────────────────────────────────
 export const register = asyncHandler(async (req, res) => {
   const { fullName, username, email, password, mobile } = req.body;
-  // const image = req.file ? req.file.path : null;
   const user = await registerUser({
     fullName,
     username,
     email,
     password,
     mobile,
+    avatarBuffer: req.file?.buffer,
+    avatarMimeType: req.file?.mimetype,
   });
   return res.status(201).json(new ApiResponse(201, { user }, 'User registered successfully'));
 });
@@ -67,7 +70,11 @@ export const inviteStoreAdmin = asyncHandler(async (req, res) => {
 });
 
 export const registerInvitedStoreAdmin = asyncHandler(async (req, res) => {
-  const result = await registerStoreAdmin(req.body);
+  const result = await registerStoreAdmin({
+    ...req.body,
+    avatarBuffer: req.file?.buffer,
+    avatarMimeType: req.file?.mimetype,
+  });
   return res
     .status(201)
     .json(
@@ -77,6 +84,17 @@ export const registerInvitedStoreAdmin = asyncHandler(async (req, res) => {
         'Store Administrator registered successfully. Awaiting administrator approval.',
       ),
     );
+});
+
+export const enrollFace = asyncHandler(async (req, res) => {
+  const user = await enrollUserFace({
+    userId: req.user.id,
+    imageBuffer: req.file?.buffer,
+    contentType: req.file?.mimetype,
+  });
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { user }, 'Face enrollment completed successfully'));
 });
 
 export const verifyStoreAdminInvitationToken = asyncHandler(async (req, res) => {
@@ -94,6 +112,13 @@ export const approveStoreAdminAccount = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(new ApiResponse(200, result, 'Store administrator approved successfully'));
+});
+
+export const rejectStoreAdminAccount = asyncHandler(async (req, res) => {
+  const result = await rejectStoreAdmin(req.params.userId, req.body.reason);
+  return res
+    .status(200)
+    .json(new ApiResponse(200, result, 'Store administrator rejected successfully'));
 });
 // ─────────────────────────────────────────────
 // POST /api/v1/auth/login
