@@ -243,4 +243,79 @@ describe('Admin directory endpoints', () => {
     expect(unauthenticated.statusCode).toBe(401);
     expect(forbidden.statusCode).toBe(403);
   });
+
+  it('lists and reviews real manager accounts with approved-store enforcement', async () => {
+    const admin = await createUser('managerreviewadmin', ROLES.ADMIN);
+    const storeAdmin = await createUser('managerreviewowner', ROLES.STORE_ADMIN);
+    const organization = await organizationModel.create({
+      name: 'Manager Review Organization',
+      email: 'manager-review@example.com',
+      ownerId: storeAdmin._id,
+      verificationStatus: 'approved',
+    });
+    const approvedStore = await StoreModel.create({
+      organizationId: organization._id,
+      name: 'Verified Manager Store',
+      code: 'MANAGER-VERIFY-01',
+      location: { lat: 19, lng: 72 },
+      status: 'active',
+      verificationStatus: 'approved',
+      createdBy: storeAdmin._id,
+    });
+    const pendingManager = await createUser('pendingmanager', ROLES.MANAGER, {
+      isApproved: false,
+      approvalStatus: 'pending',
+    });
+    const rejectedManager = await createUser('rejectmanager', ROLES.MANAGER, {
+      isApproved: false,
+      approvalStatus: 'pending',
+    });
+    await EmployeeModel.create({
+      organizationId: organization._id,
+      storeId: approvedStore._id,
+      userId: pendingManager._id,
+      employeeCode: 'MGR-PENDING-01',
+      designation: 'Store Manager',
+      salary: 0,
+    });
+    const token = admin.generateAccessToken();
+
+    const pending = await request(app)
+      .get('/api/v1/admin/manager-verifications?status=pending')
+      .set('Cookie', `accessToken=${token}`);
+    expect(pending.statusCode).toBe(200);
+    expect(pending.body.data.managers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: pendingManager.id,
+          status: 'pending',
+          assignedStore: expect.objectContaining({
+            name: 'Verified Manager Store',
+            approvalStatus: 'approved',
+          }),
+        }),
+      ]),
+    );
+
+    const approved = await request(app)
+      .patch(`/api/v1/admin/manager-verifications/${pendingManager.id}/approve`)
+      .set('Cookie', `accessToken=${token}`);
+    expect(approved.statusCode).toBe(200);
+    expect(approved.body.data.manager).toMatchObject({
+      id: pendingManager.id,
+      status: 'approved',
+    });
+
+    const rejected = await request(app)
+      .patch(`/api/v1/admin/manager-verifications/${rejectedManager.id}/reject`)
+      .set('Cookie', `accessToken=${token}`)
+      .send({ reason: 'Manager information could not be verified' });
+    expect(rejected.statusCode).toBe(200);
+    expect(rejected.body.data.manager).toMatchObject({
+      id: rejectedManager.id,
+      status: 'rejected',
+      rejectionReason: 'Manager information could not be verified',
+    });
+    expect(await UserModel.findById(rejectedManager.id).then((user) => user.isActive)).toBe(false);
+  });
 });

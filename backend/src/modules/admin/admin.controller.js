@@ -7,6 +7,8 @@ import {
   listStoreVerifications,
   listAdminUsers,
   reviewStoreVerification,
+  listAdminManagers,
+  reviewManagerVerification,
 } from './admin.service.js';
 
 export const getDashboardStats = asyncHandler(async (_req, res) => {
@@ -51,4 +53,25 @@ export const rejectStore = asyncHandler(async (req, res) => {
     req.body.reason,
   );
   return res.status(200).json(new ApiResponse(200, { store }, 'Store application rejected'));
+});
+
+export const getManagerVerifications = asyncHandler(async (req, res) => {
+  const managers = await listAdminManagers(req.query.status);
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { managers }, 'Manager verifications fetched successfully'));
+});
+
+export const approveManager = asyncHandler(async (req, res) => {
+  const manager = await reviewManagerVerification(req.params.managerId, 'approved');
+  return res.status(200).json(new ApiResponse(200, { manager }, 'Manager approved successfully'));
+});
+
+export const rejectManager = asyncHandler(async (req, res) => {
+  const manager = await reviewManagerVerification(
+    req.params.managerId,
+    'rejected',
+    req.body.reason,
+  );
+  return res.status(200).json(new ApiResponse(200, { manager }, 'Manager rejected successfully'));
 });

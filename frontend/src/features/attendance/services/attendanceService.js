@@ -17,6 +17,8 @@ export const attendanceService = {
         ...(location ? { lat: location.lat, lng: location.lng } : {}),
       },
     }),
+  getMine: (params) => api.get("/attendance/mine", { params }),
+  getRecords: (params) => api.get("/attendance", { params }),
   checkIn: (organizationId, location, image) =>
     api.post("/attendance/check-in", createAttendanceForm(organizationId, location, image), {
       headers: { "Content-Type": "multipart/form-data" },

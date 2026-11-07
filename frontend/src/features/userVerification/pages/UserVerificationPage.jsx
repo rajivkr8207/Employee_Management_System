@@ -17,10 +17,12 @@ import {
     fetchUsersThunk,
     verifyUserThunk,
     rejectUserThunk,
+} from "../userVerification.thunk";
+import {
     setActiveTab,
     setSelectedUser,
     clearSelectedUser,
-} from "../userVerificationSlice";
+} from "../userVerification.slice";
 import Card from "../../../components/ui/Card";
 import Button from "../../../components/ui/Button";
 import Badge from "../../../components/ui/Badge";

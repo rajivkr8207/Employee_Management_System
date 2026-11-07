@@ -92,6 +92,93 @@ export const listAdminEmployees = () =>
     .sort({ createdAt: -1 })
     .lean();
 
+export const listAdminManagers = async (statusFilter = 'all') => {
+  const users = await User.find({ role: ROLES.MANAGER })
+    .select(userFields)
+    .sort({ createdAt: -1 })
+    .lean();
+  const employees = await EmployeeModel.find({
+    userId: { $in: users.map((user) => user._id) },
+  })
+    .populate('storeId', 'name code address status verificationStatus')
+    .sort({ createdAt: -1 })
+    .lean();
+  const employeeByUserId = new Map(
+    employees.map((employee) => [employee.userId.toString(), employee]),
+  );
+  const managers = users.map((user) => {
+    const employee = employeeByUserId.get(user._id.toString());
+    const store = employee?.storeId;
+    const status =
+      user.approvalStatus ||
+      (user.isApproved ? 'approved' : 'pending');
+    return {
+      id: user._id.toString(),
+      fullName: user.fullName,
+      email: user.email,
+      phone: user.mobile,
+      avatar: user.avatar,
+      registrationDate: user.createdAt,
+      status,
+      rejectionReason: user.rejectionReason,
+      experience: employee?.designation,
+      assignedStore: store
+        ? {
+            id: store._id.toString(),
+            name: store.name,
+            code: store.code,
+            city: store.address?.city,
+            approvalStatus:
+              store.verificationStatus || (store.status === 'active' ? 'approved' : 'pending'),
+          }
+        : null,
+    };
+  });
+  return statusFilter === 'all'
+    ? managers
+    : managers.filter((manager) => manager.status === statusFilter);
+};
+
+export const reviewManagerVerification = async (managerId, status, reason = null) => {
+  const manager = await User.findOne({ _id: managerId, role: ROLES.MANAGER }).select(
+    '+refreshTokenHash +refreshTokenVersion',
+  );
+  if (!manager) throw new ApiError(404, 'Manager was not found');
+  if (manager.approvalStatus !== 'pending' && manager.isApproved) {
+    throw new ApiError(409, 'Only pending manager accounts can be reviewed');
+  }
+  if (status === 'approved') {
+    const employee = await EmployeeModel.findOne({
+      userId: manager._id,
+      status: 'active',
+    }).populate('storeId', 'status verificationStatus');
+    if (
+      !employee ||
+      employee.storeId?.status !== 'active' ||
+      employee.storeId?.verificationStatus !== 'approved'
+    ) {
+      throw new ApiError(409, 'An active manager assignment to an approved store is required');
+    }
+    manager.isApproved = true;
+    manager.isActive = true;
+    manager.approvalStatus = 'approved';
+    manager.rejectionReason = null;
+  } else {
+    manager.isApproved = false;
+    manager.isActive = false;
+    manager.approvalStatus = 'rejected';
+    manager.rejectionReason = reason;
+    manager.refreshTokenHash = null;
+    manager.refreshTokenVersion += 1;
+  }
+  await manager.save();
+  const updated = (await listAdminManagers(status)).find(
+    (item) => item.id === managerId.toString(),
+  );
+  if (!updated) throw new ApiError(404, 'Manager was not found');
+  return updated;
+};
+
 export const getAdminDashboardStats = async () => {
   const [
     totalUsers,

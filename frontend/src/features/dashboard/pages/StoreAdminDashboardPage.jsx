@@ -5,8 +5,8 @@ import { Building2, Clock3, Mail, MapPin, Store, Users, UserRound } from "lucide
 import Card from "../../../components/ui/Card";
 import Badge from "../../../components/ui/Badge";
 import Button from "../../../components/ui/Button";
-import { fetchEmployees } from "../../employees/employeeSlice";
-import { fetchMyStores } from "../../store/storeSlice";
+import { fetchEmployees } from "../../employees/employees.thunk";
+import { fetchMyStores } from "../../store/store.thunk";
 
 const formatDate = (value) => {
     if (!value) return "Not provided";

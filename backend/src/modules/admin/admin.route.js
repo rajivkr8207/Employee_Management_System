@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { body, param } from 'express-validator';
+import { body, param, query } from 'express-validator';
 import { verifyAdmin, verifyJWT } from '../../middlewares/auth.middleware.js';
 import { validate } from '../../config/validate.js';
 import {
@@ -10,6 +10,9 @@ import {
   getStoreVerifications,
   getUsers,
   rejectStore,
+  getManagerVerifications,
+  approveManager,
+  rejectManager,
 } from './admin.controller.js';
 
 const adminRouter = Router();
@@ -33,5 +36,24 @@ adminRouter.patch(
   rejectStore,
 );
 adminRouter.get('/employees', getEmployees);
+adminRouter.get(
+  '/manager-verifications',
+  query('status').optional().isIn(['all', 'pending', 'approved', 'rejected']),
+  validate,
+  getManagerVerifications,
+);
+adminRouter.patch(
+  '/manager-verifications/:managerId/approve',
+  param('managerId').isMongoId().withMessage('A valid manager ID is required'),
+  validate,
+  approveManager,
+);
+adminRouter.patch(
+  '/manager-verifications/:managerId/reject',
+  param('managerId').isMongoId().withMessage('A valid manager ID is required'),
+  body('reason').trim().notEmpty().isLength({ max: 500 }).withMessage('A rejection reason is required'),
+  validate,
+  rejectManager,
+);
 
 export default adminRouter;

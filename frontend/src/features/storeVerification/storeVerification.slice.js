@@ -1,49 +1,22 @@
-import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { storeVerificationService } from "./services/storeVerificationService";
+import { createSlice } from "@reduxjs/toolkit";
+import {
+    approveStoreThunk,
+    fetchStoresThunk,
+    rejectStoreThunk,
+} from "./storeVerification.thunk";
 
-export const fetchStoresThunk = createAsyncThunk(
-    "storeVerification/fetchStores",
-    async (tab = "all", { rejectWithValue }) => {
-        try {
-            return await storeVerificationService.getStores(tab);
-        } catch (err) {
-            return rejectWithValue(err.message || "Failed to fetch stores");
-        }
-    }
-);
-
-export const approveStoreThunk = createAsyncThunk(
-    "storeVerification/approveStore",
-    async (storeId, { rejectWithValue }) => {
-        try {
-            return await storeVerificationService.approveStore(storeId);
-        } catch (err) {
-            return rejectWithValue(err.message || "Failed to approve store");
-        }
-    }
-);
-
-export const rejectStoreThunk = createAsyncThunk(
-    "storeVerification/rejectStore",
-    async ({ storeId, reason }, { rejectWithValue }) => {
-        try {
-            return await storeVerificationService.rejectStore(storeId, reason);
-        } catch (err) {
-            return rejectWithValue(err.message || "Failed to reject store");
-        }
-    }
-);
+const initialState = {
+    stores: [],
+    selectedStore: null,
+    activeTab: "all",
+    loading: false,
+    actionLoading: false,
+    error: null,
+};
 
 const storeVerificationSlice = createSlice({
     name: "storeVerification",
-    initialState: {
-        stores: [],
-        selectedStore: null,
-        activeTab: "all", // all | pending | approved | rejected
-        loading: false,
-        actionLoading: false,
-        error: null,
-    },
+    initialState,
     reducers: {
         setActiveTab: (state, action) => {
             state.activeTab = action.payload;
@@ -57,7 +30,6 @@ const storeVerificationSlice = createSlice({
     },
     extraReducers: (builder) => {
         builder
-            // Fetch stores
             .addCase(fetchStoresThunk.pending, (state) => {
                 state.loading = true;
                 state.error = null;
@@ -70,38 +42,34 @@ const storeVerificationSlice = createSlice({
                 state.loading = false;
                 state.error = action.payload;
             })
-            // Approve
             .addCase(approveStoreThunk.pending, (state) => {
                 state.actionLoading = true;
             })
             .addCase(approveStoreThunk.fulfilled, (state, action) => {
                 state.actionLoading = false;
                 const updated = action.payload;
-                state.stores = state.stores.map((s) => (s.id === updated.id ? updated : s));
-                if (state.selectedStore?.id === updated.id) {
-                    state.selectedStore = updated;
-                }
+                state.stores = state.stores.map((store) => (store.id === updated.id ? updated : store));
+                if (state.selectedStore?.id === updated.id) state.selectedStore = updated;
             })
             .addCase(approveStoreThunk.rejected, (state, action) => {
                 state.actionLoading = false;
                 state.error = action.payload;
             })
-            // Reject
             .addCase(rejectStoreThunk.pending, (state) => {
                 state.actionLoading = true;
             })
             .addCase(rejectStoreThunk.fulfilled, (state, action) => {
                 state.actionLoading = false;
                 const updated = action.payload;
-                state.stores = state.stores.map((s) => (s.id === updated.id ? updated : s));
-                if (state.selectedStore?.id === updated.id) {
-                    state.selectedStore = updated;
-                }
+                state.stores = state.stores.map((store) => (store.id === updated.id ? updated : store));
+                if (state.selectedStore?.id === updated.id) state.selectedStore = updated;
             })
             .addCase(rejectStoreThunk.rejected, (state, action) => {
                 state.actionLoading = false;
                 state.error = action.payload;
-            });
+            })
+            .addCase("auth/clearAuth", () => initialState)
+            .addCase("auth/logout/fulfilled", () => initialState);
     },
 });
 

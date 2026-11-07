@@ -4,14 +4,14 @@ import { CalendarDays, Clock3, Trash2 } from "lucide-react";
 import Badge from "../../../components/ui/Badge";
 import Button from "../../../components/ui/Button";
 import Card from "../../../components/ui/Card";
-import { fetchEmployees } from "../../employees/employeeSlice";
-import { fetchMyStores } from "../../store/storeSlice";
+import { fetchEmployees } from "../../employees/employees.thunk";
+import { fetchMyStores } from "../../store/store.thunk";
 import {
   createShiftAssignment,
   createShiftTemplate,
   deleteShiftAssignment,
   fetchShiftSchedule,
-} from "../shiftSlice";
+} from "../shift.thunk";
 
 const today = () => {
   const date = new Date();
