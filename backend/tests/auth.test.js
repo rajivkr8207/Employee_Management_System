@@ -157,6 +157,58 @@ describe('Auth API', () => {
       expect(res.statusCode).toEqual(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data.accessToken).toBeTruthy();
+      expect(res.body.data.refreshToken).toBeUndefined();
+      expect(res.headers['set-cookie'].join(';')).toContain('accessToken=');
+      expect(res.headers['set-cookie'].join(';')).toContain('refreshToken=');
+    });
+
+    it('refreshes expired access cookies and accepts the fresh bearer token on retry', async () => {
+      const user = await UserModel.findOne({ email: validUser.email }).select(
+        '+refreshTokenHash +refreshTokenVersion',
+      );
+      const login = await request(app).post('/api/v1/auth/login').send({
+        identifier: validUser.email,
+        password: validUser.password,
+      });
+      const originalCookies = login.headers['set-cookie'];
+      const refreshCookie = originalCookies
+        .find((cookie) => cookie.startsWith('refreshToken='))
+        .split(';')[0];
+      const originalRefreshToken = refreshCookie.slice('refreshToken='.length);
+      const loggedInUser = await UserModel.findById(user.id).select('+refreshTokenHash');
+      expect(loggedInUser.refreshTokenHash).not.toBe(originalRefreshToken);
+      expect(loggedInUser.compareRefreshToken(originalRefreshToken)).toBe(true);
+
+      // Existing sessions used to store the raw refresh token; they should survive one rotation.
+      await UserModel.updateOne(
+        { _id: user.id },
+        { $set: { refreshTokenHash: originalRefreshToken } },
+      );
+
+      const refreshed = await request(app)
+        .post('/api/v1/auth/refresh-token')
+        .set('Cookie', `${refreshCookie}; accessToken=expired-access-token`);
+
+      expect(refreshed.statusCode).toBe(200);
+      expect(refreshed.body.data.accessToken).toBeTruthy();
+      expect(refreshed.body.data.refreshToken).toBeUndefined();
+      expect(refreshed.headers['set-cookie'].join(';')).toContain('accessToken=');
+      expect(refreshed.headers['set-cookie'].join(';')).toContain('refreshToken=');
+
+      const profile = await request(app)
+        .get('/api/v1/auth/profile')
+        .set('Cookie', 'accessToken=expired-access-token')
+        .set('Authorization', `Bearer ${refreshed.body.data.accessToken}`);
+
+      expect(profile.statusCode).toBe(200);
+      expect(profile.body.data.email).toBe(validUser.email);
+
+      const reusedRefreshToken = await request(app)
+        .post('/api/v1/auth/refresh-token')
+        .set('Cookie', refreshCookie);
+      expect(reusedRefreshToken.statusCode).toBe(401);
+      const savedUser = await UserModel.findById(user.id).select('+refreshTokenVersion');
+      expect(savedUser.refreshTokenVersion).toBe(2);
     });
 
     it('should fail with incorrect password', async () => {

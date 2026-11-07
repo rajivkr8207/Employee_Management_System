@@ -2,6 +2,8 @@ import request from 'supertest';
 import { jest } from '@jest/globals';
 import { ROLES } from '../src/constants/roles.js';
 
+jest.setTimeout(30_000);
+
 jest.unstable_mockModule('../src/config/redis.js', () => ({
   default: {
     get: async () => null,

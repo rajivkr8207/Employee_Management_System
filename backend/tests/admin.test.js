@@ -24,6 +24,7 @@ const { default: UserModel } = await import('../src/modules/user/user.model.js')
 const { organizationModel } = await import('../src/modules/organization/organization.model.js');
 const { StoreModel } = await import('../src/modules/store/store.model.js');
 const { EmployeeModel } = await import('../src/modules/employee/employee.model.js');
+const { default: ActivityLog } = await import('../src/modules/activityLog/activityLog.model.js');
 const { connectTestDB, closeTestDB, clearTestDB } = await import('./setup.js');
 
 const createUser = async (username, role, properties = {}) =>
@@ -236,12 +237,18 @@ describe('Admin directory endpoints', () => {
     const token = storeAdmin.generateAccessToken();
 
     const unauthenticated = await request(app).get('/api/v1/admin/users');
+    const unauthenticatedLogs = await request(app).get('/api/v1/admin/activity-logs');
     const forbidden = await request(app)
       .get('/api/v1/admin/users')
       .set('Cookie', `accessToken=${token}`);
+    const forbiddenLogs = await request(app)
+      .get('/api/v1/admin/activity-logs')
+      .set('Cookie', `accessToken=${token}`);
 
     expect(unauthenticated.statusCode).toBe(401);
+    expect(unauthenticatedLogs.statusCode).toBe(401);
     expect(forbidden.statusCode).toBe(403);
+    expect(forbiddenLogs.statusCode).toBe(403);
   });
 
   it('lists and reviews real manager accounts with approved-store enforcement', async () => {
@@ -317,5 +324,56 @@ describe('Admin directory endpoints', () => {
       rejectionReason: 'Manager information could not be verified',
     });
     expect(await UserModel.findById(rejectedManager.id).then((user) => user.isActive)).toBe(false);
+  });
+
+  it('records successful and failed actions and lets admins filter activity logs', async () => {
+    const admin = await createUser('activitylogadmin', ROLES.ADMIN);
+    const account = await createUser('activitypendingaccount', ROLES.STORE_ADMIN, {
+      isApproved: false,
+      approvalStatus: 'pending',
+    });
+    const token = admin.generateAccessToken();
+
+    const successfulAction = await request(app)
+      .patch(`/api/v1/auth/store-admin/${account.id}/approve`)
+      .set('Cookie', `accessToken=${token}`);
+    const failedAction = await request(app)
+      .patch(`/api/v1/admin/store-verifications/${admin.id}/approve`)
+      .set('Cookie', `accessToken=${token}`);
+
+    expect(successfulAction.statusCode).toBe(200);
+    expect(failedAction.statusCode).toBe(404);
+    expect(await ActivityLog.countDocuments()).toBe(2);
+
+    const logs = await request(app)
+      .get('/api/v1/admin/activity-logs?outcome=failure&search=store%20verification&limit=5')
+      .set('Cookie', `accessToken=${token}`);
+
+    expect(logs.statusCode).toBe(200);
+    expect(logs.body.data).toMatchObject({
+      pagination: { page: 1, limit: 5, total: 1, totalPages: 1 },
+    });
+    expect(logs.body.data.logs[0]).toMatchObject({
+      actorId: admin.id,
+      actorName: admin.fullName,
+      actorEmail: admin.email,
+      actorRole: ROLES.ADMIN,
+      action: 'Store verification approved',
+      outcome: 'failure',
+      statusCode: 404,
+    });
+
+    const allLogs = await request(app)
+      .get('/api/v1/admin/activity-logs')
+      .set('Cookie', `accessToken=${token}`);
+    expect(allLogs.body.data.logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'Store administrator account approved',
+          outcome: 'success',
+          statusCode: 200,
+        }),
+      ]),
+    );
   });
 });

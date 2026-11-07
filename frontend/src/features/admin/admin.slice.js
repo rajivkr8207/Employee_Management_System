@@ -1,6 +1,7 @@
 import { createSlice } from "@reduxjs/toolkit";
 import {
     fetchAdminDashboardStatsThunk,
+    fetchAdminActivityLogsThunk,
     fetchAdminEmployeesThunk,
     fetchAdminStoresThunk,
     fetchAdminUsersThunk,
@@ -19,6 +20,10 @@ const initialState = {
     employees: [],
     employeesLoading: false,
     employeesError: null,
+    activityLogs: [],
+    activityLogsPagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
+    activityLogsLoading: false,
+    activityLogsError: null,
 };
 
 const adminSlice = createSlice({
@@ -59,6 +64,21 @@ const adminSlice = createSlice({
                     state[`${key}Error`] = action.payload;
                 });
         });
+
+        builder
+            .addCase(fetchAdminActivityLogsThunk.pending, (state) => {
+                state.activityLogsLoading = true;
+                state.activityLogsError = null;
+            })
+            .addCase(fetchAdminActivityLogsThunk.fulfilled, (state, action) => {
+                state.activityLogsLoading = false;
+                state.activityLogs = action.payload.logs;
+                state.activityLogsPagination = action.payload.pagination;
+            })
+            .addCase(fetchAdminActivityLogsThunk.rejected, (state, action) => {
+                state.activityLogsLoading = false;
+                state.activityLogsError = action.payload;
+            });
     },
 });
 

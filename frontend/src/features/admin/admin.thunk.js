@@ -33,3 +33,15 @@ export const fetchAdminEmployeesThunk = createDirectoryThunk(
     "getEmployees",
     "employees",
 );
+
+export const fetchAdminActivityLogsThunk = createAsyncThunk(
+    "admin/fetchActivityLogs",
+    async (params, { rejectWithValue }) => {
+        try {
+            const response = await adminService.getActivityLogs(params);
+            return response.data.data;
+        } catch (error) {
+            return rejectWithValue(errorMessage(error, "Failed to fetch activity logs"));
+        }
+    },
+);

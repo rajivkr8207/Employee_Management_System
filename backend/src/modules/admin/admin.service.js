@@ -3,6 +3,7 @@ import User from '../user/user.model.js';
 import { StoreModel } from '../store/store.model.js';
 import { EmployeeModel } from '../employee/employee.model.js';
 import { ApiError } from '../../utils/ApiError.js';
+import { listActivityLogs } from '../activityLog/activityLog.service.js';
 
 const userFields =
   'fullName username email mobile avatar role isVerified isApproved approvalStatus rejectionReason isActive isBlocked createdAt';
@@ -21,6 +22,8 @@ export const listAdminUsers = () =>
     .select(userFields)
     .sort({ createdAt: -1 })
     .lean();
+
+export const getAdminActivityLogs = (filters) => listActivityLogs(filters);
 
 export const listAdminStores = async () => {
   const [stores, employeeCounts] = await Promise.all([

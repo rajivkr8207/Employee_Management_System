@@ -6,7 +6,7 @@ import { StoreModel } from './store.model.js';
 import { MembershipModel } from '../membership/membership.model.js';
 import { EmployeeModel } from '../employee/employee.model.js';
 import { MailService } from '../../services/mail.service.js';
-import Config from '../../config/Config.js';
+import Config from '../../config/config.js';
 import crypto from 'crypto';
 
 const populateManager = (query) => query.populate('managerId', 'fullName username role');
