@@ -8,6 +8,8 @@ import crypto from 'crypto';
 import { URL } from 'node:url';
 import { ROLES } from '../../constants/roles.js';
 import { createFaceProfileData } from './face.service.js';
+import { uploadImageToImageKit } from '../../services/image.service.js';
+import logger from '../../config/logger.js';
 
 export const registerUser = async (registrationData) => {
   const { token, fullName, username, password, mobile, avatarBuffer, avatarMimeType } =
@@ -302,11 +304,40 @@ export const getUserById = async (id) => {
   return user;
 };
 
-export const editUserProfile = async (id, { fullName, username, mobile }) => {
+export const editUserProfile = async (
+  id,
+  { fullName, username, mobile, avatarBuffer, avatarMimeType },
+) => {
   const updates = {};
   if (fullName !== undefined) updates.fullName = fullName;
   if (username !== undefined) updates.username = username;
   if (mobile !== undefined) updates.mobile = mobile;
+  if (avatarBuffer) {
+    const extension = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[
+      avatarMimeType
+    ];
+    const fileName = `avatar-${crypto.randomBytes(12).toString('hex')}.${extension || 'jpg'}`;
+    try {
+      const upload = await uploadImageToImageKit({
+        buffer: avatarBuffer,
+        fileName,
+        contentType: avatarMimeType,
+        folderPath: 'employee-avatars',
+      });
+      if (!upload?.url) throw new ApiError(502, 'ImageKit did not return an image URL');
+      updates.avatar = upload.url;
+    } catch (error) {
+      logger.error('Failed to upload profile avatar to ImageKit', {
+        status: error?.status,
+        requestId: error?.headers?.get?.('x-ik-requestid'),
+        code: error?.code,
+        message: error instanceof Error ? error.message : String(error),
+        details: error?.error,
+      });
+      updates.avatar = `data:${avatarMimeType};base64,${avatarBuffer.toString('base64')}`;
+    }
+  }
+
   const user = await User.findByIdAndUpdate(
     id,
     { $set: updates },

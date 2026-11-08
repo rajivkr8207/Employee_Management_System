@@ -78,12 +78,25 @@ export const updateProfileThunk = createAsyncThunk(
     "auth/updateProfile",
     async (formData, { rejectWithValue }) => {
         try {
-            const payload = {
+            const payload = formData.avatar ? new FormData() : {};
+            const fields = {
                 ...(formData.fullName || formData.name ? { fullName: formData.fullName || formData.name } : {}),
                 ...(formData.username ? { username: formData.username } : {}),
                 ...(formData.mobile || formData.phone ? { mobile: formData.mobile || formData.phone } : {}),
             };
-            const { data } = await api.patch("/auth/profile", payload);
+            if (payload instanceof FormData) {
+                Object.entries(fields).forEach(([key, value]) => payload.append(key, value));
+                payload.append("image", formData.avatar);
+            } else {
+                Object.assign(payload, fields);
+            }
+            const { data } = await api.patch(
+                "/auth/profile",
+                payload,
+                payload instanceof FormData
+                    ? { headers: { "Content-Type": "multipart/form-data" } }
+                    : undefined
+            );
             return data?.data || data;
         } catch (err) {
             return rejectWithValue(extractError(err));

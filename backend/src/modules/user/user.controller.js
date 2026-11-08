@@ -87,14 +87,14 @@ export const registerInvitedStoreAdmin = asyncHandler(async (req, res) => {
 });
 
 export const enrollFace = asyncHandler(async (req, res) => {
-  const user = await enrollUserFace({
+  const result = await enrollUserFace({
     userId: req.user.id,
     imageBuffer: req.file?.buffer,
     contentType: req.file?.mimetype,
   });
   return res
     .status(200)
-    .json(new ApiResponse(200, { user }, 'Face enrollment completed successfully'));
+    .json(new ApiResponse(200, result, 'Face enrollment completed successfully'));
 });
 
 export const verifyStoreAdminInvitationToken = asyncHandler(async (req, res) => {
@@ -190,7 +190,13 @@ export const getProfile = asyncHandler(async (req, res) => {
 export const editProfile = asyncHandler(async (req, res) => {
   const { fullName, username, mobile } = req.body;
 
-  const user = await editUserProfile(req.user.id, { fullName, username, mobile });
+  const user = await editUserProfile(req.user.id, {
+    fullName,
+    username,
+    mobile,
+    avatarBuffer: req.file?.buffer,
+    avatarMimeType: req.file?.mimetype,
+  });
 
   return res.status(200).json(new ApiResponse(200, user, 'Profile updated successfully'));
 });

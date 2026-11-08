@@ -2,6 +2,8 @@ import request from 'supertest';
 import { jest } from '@jest/globals';
 import crypto from 'node:crypto';
 
+let mockImageKitUploadError = null;
+
 jest.unstable_mockModule('../src/config/redis.js', () => ({
   default: {
     get: async () => null,
@@ -22,7 +24,10 @@ jest.unstable_mockModule('../src/services/mail.service.js', () => ({
 }));
 
 jest.unstable_mockModule('../src/services/image.service.js', () => ({
-  UploadImageToImageKit: async () => ({ url: 'https://ik.imagekit.io/test/enrolled-face.jpg' }),
+  uploadImageToImageKit: async () => {
+    if (mockImageKitUploadError) throw mockImageKitUploadError;
+    return { url: 'https://ik.imagekit.io/test/enrolled-face.jpg' };
+  },
 }));
 
 jest.unstable_mockModule('../src/services/faceRecognition.service.js', () => ({
@@ -43,6 +48,7 @@ beforeAll(async () => {
 
 afterEach(async () => {
   await clearTestDB();
+  mockImageKitUploadError = null;
 });
 
 afterAll(async () => {
@@ -126,6 +132,81 @@ describe('Auth API', () => {
         const savedUser = await UserModel.findById(user.id).select('+faceEmbedding');
         expect(savedUser.faceEmbedding).toHaveLength(128);
         expect(savedUser.faceEnrolledAt).toBeTruthy();
+      });
+
+      it('saves the avatar in MongoDB if the profile photo upload fails', async () => {
+        const user = await UserModel.create({
+          ...validUser,
+          username: 'faceenrollmentwithoutavatar',
+          email: 'face-enrollment-without-avatar@example.com',
+          isVerified: true,
+        });
+        mockImageKitUploadError = new Error('ImageKit upload unavailable');
+
+        const response = await request(app)
+          .post('/api/v1/auth/face/enroll')
+          .set('Cookie', `accessToken=${user.generateAccessToken()}`)
+          .attach('image', Buffer.from('test face image'), {
+            filename: 'face.jpg',
+            contentType: 'image/jpeg',
+          });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.body.data.warning).toMatch(/avatar are saved in MongoDB/i);
+        expect(response.body.data.user.avatar).toMatch(/^data:image\/jpeg;base64,/);
+        const savedUser = await UserModel.findById(user.id).select('+faceEmbedding');
+        expect(savedUser.faceEmbedding).toHaveLength(128);
+        expect(savedUser.faceEnrolledAt).toBeTruthy();
+        expect(savedUser.avatar).toBe(response.body.data.user.avatar);
+      });
+    });
+
+    describe('PATCH /api/v1/auth/profile', () => {
+      it('uploads and saves a changed profile photo', async () => {
+        const user = await UserModel.create({
+          ...validUser,
+          username: 'profilephotoupload',
+          email: 'profile-photo-upload@example.com',
+          isVerified: true,
+        });
+
+        const response = await request(app)
+          .patch('/api/v1/auth/profile')
+          .set('Cookie', `accessToken=${user.generateAccessToken()}`)
+          .field('fullName', 'Updated Profile User')
+          .attach('image', Buffer.from('profile photo'), {
+            filename: 'profile.jpg',
+            contentType: 'image/jpeg',
+          });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.body.data.avatar).toBe('https://ik.imagekit.io/test/enrolled-face.jpg');
+        expect(response.body.data.fullName).toBe('Updated Profile User');
+        const savedUser = await UserModel.findById(user.id);
+        expect(savedUser.avatar).toBe('https://ik.imagekit.io/test/enrolled-face.jpg');
+      });
+
+      it('saves a changed profile photo in MongoDB when ImageKit is unavailable', async () => {
+        const user = await UserModel.create({
+          ...validUser,
+          username: 'profilephotofallback',
+          email: 'profile-photo-fallback@example.com',
+          isVerified: true,
+        });
+        mockImageKitUploadError = new Error('ImageKit upload unavailable');
+
+        const response = await request(app)
+          .patch('/api/v1/auth/profile')
+          .set('Cookie', `accessToken=${user.generateAccessToken()}`)
+          .attach('image', Buffer.from('profile photo'), {
+            filename: 'profile.jpg',
+            contentType: 'image/jpeg',
+          });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.body.data.avatar).toMatch(/^data:image\/jpeg;base64,/);
+        const savedUser = await UserModel.findById(user.id);
+        expect(savedUser.avatar).toBe(response.body.data.avatar);
       });
     });
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { User, Mail, Briefcase, Phone, MapPin, Calendar, Camera, LogOut, Shield, Check } from "lucide-react";
 import useAuth from "../hooks/useAuth";
 import Card from "../../../components/ui/Card";
@@ -73,6 +73,17 @@ export default function Profile() {
         position: user?.position || "",
     });
     const [successMsg, setSuccessMsg] = useState("");
+    const [avatarFile, setAvatarFile] = useState(null);
+    const [avatarPreview, setAvatarPreview] = useState("");
+    const [avatarError, setAvatarError] = useState("");
+    const avatarInputRef = useRef(null);
+
+    useEffect(
+        () => () => {
+            if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+        },
+        [avatarPreview],
+    );
 
     /* load latest profile on mount */
     useEffect(() => {
@@ -94,18 +105,47 @@ export default function Profile() {
     const handleChange = (e) =>
         setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
+    const handleAvatarChange = (event) => {
+        const file = event.target.files?.[0];
+        event.target.value = "";
+        if (!file) return;
+        if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+            setAvatarError("Choose a JPEG, PNG, or WebP image.");
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            setAvatarError("Profile photos must be 5 MB or smaller.");
+            return;
+        }
+        setAvatarError("");
+        setAvatarFile(file);
+        setAvatarPreview(URL.createObjectURL(file));
+        setTab("edit");
+    };
+
     const handleSave = async (e) => {
         e.preventDefault();
         const res = await updateProfile({
             fullName: form.fullName,
             username: form.username,
             mobile: form.phone,
+            avatar: avatarFile,
         });
         if (res?.success) {
+            setAvatarFile(null);
+            setAvatarPreview("");
+            setAvatarError("");
             setSuccessMsg("Profile updated successfully!");
             setTab("overview");
             setTimeout(() => setSuccessMsg(""), 3500);
         }
+    };
+
+    const handleCancelEdit = () => {
+        setAvatarFile(null);
+        setAvatarPreview("");
+        setAvatarError("");
+        setTab("overview");
     };
 
     const inputCls = [
@@ -149,15 +189,28 @@ export default function Profile() {
                         <div className="flex flex-col items-center text-center">
                             {/* Avatar */}
                             <div className="relative mb-4">
-                                <Avatar user={user} size="lg" />
+                                <Avatar user={{ ...user, ...(avatarPreview ? { avatar: avatarPreview } : {}) }} size="lg" />
                                 <button
                                     type="button"
+                                    onClick={() => avatarInputRef.current?.click()}
+                                    disabled={updateLoading}
                                     className="absolute bottom-0 right-0 flex items-center justify-center w-7 h-7 rounded-full bg-[var(--primary)] text-white shadow-md hover:opacity-90 transition-opacity"
                                     title="Change photo"
+                                    aria-label="Change profile photo"
                                 >
                                     <Camera size={13} />
                                 </button>
+                                <input
+                                    ref={avatarInputRef}
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp"
+                                    onChange={handleAvatarChange}
+                                    className="hidden"
+                                    aria-label="Choose a profile photo"
+                                />
                             </div>
+                            <p className="mb-3 text-xs text-[var(--text-muted)]">JPEG, PNG, or WebP · Max 5 MB</p>
+                            {avatarError && <p role="alert" className="mb-3 text-xs text-[var(--danger)]">{avatarError}</p>}
 
                             <h2 className="text-base font-bold text-[var(--text-primary)] mb-1">
                                 {user?.fullName || user?.name || user?.username || "—"}
@@ -179,7 +232,7 @@ export default function Profile() {
                                 <Button
                                     variant="outline"
                                     className="w-full"
-                                    onClick={() => (tab === "edit" ? setTab("overview") : handleStartEdit())}
+                                    onClick={() => (tab === "edit" ? handleCancelEdit() : handleStartEdit())}
                                 >
                                     {tab === "edit" ? "Cancel editing" : "Edit Profile"}
                                 </Button>
@@ -299,7 +352,7 @@ export default function Profile() {
                                         <Button
                                             type="button"
                                             variant="secondary"
-                                            onClick={() => setTab("overview")}
+                                            onClick={handleCancelEdit}
                                             disabled={updateLoading}
                                         >
                                             Cancel
@@ -321,4 +374,3 @@ export default function Profile() {
         </div>
     );
 }
-

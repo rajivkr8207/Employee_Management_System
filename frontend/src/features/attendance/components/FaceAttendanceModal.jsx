@@ -133,7 +133,7 @@ export default function FaceAttendanceModal({
         </div>
         <p className="text-xs text-[var(--text-secondary)]">
           {isEnrollment
-            ? "Your enrollment selfie is saved to ImageKit as your avatar. The face template is stored privately for attendance matching."
+            ? "Your face template and avatar are saved to your account. The face template is private and used for attendance matching."
             : "Face matching runs on this application server. Attendance photos are processed for verification and are not uploaded or saved."}
         </p>
         {(error || cameraError) && (

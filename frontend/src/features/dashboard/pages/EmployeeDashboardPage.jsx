@@ -15,6 +15,7 @@ import {
 import Badge from "../../../components/ui/Badge";
 import Card from "../../../components/ui/Card";
 import { fetchMyEmployee } from "../../employees/employees.thunk";
+import { fetchProfileThunk } from "../../auth/auth.thunk";
 import {
     enrollMyFace,
     fetchTodayAttendance,
@@ -85,6 +86,7 @@ export default function EmployeeDashboardPage() {
         (state) => state.employees
     );
     const [locationError, setLocationError] = useState("");
+    const [enrollmentNotice, setEnrollmentNotice] = useState("");
     const [modalAction, setModalAction] = useState("");
 
     useEffect(() => {
@@ -122,7 +124,9 @@ export default function EmployeeDashboardPage() {
         async (image) => {
             try {
                 if (modalAction === "enroll") {
-                    await dispatch(enrollMyFace(image)).unwrap();
+                    const enrollment = await dispatch(enrollMyFace(image)).unwrap();
+                    setEnrollmentNotice(enrollment.warning || "");
+                    dispatch(fetchProfileThunk({ force: true }));
                     try {
                         const location = await getCurrentLocation();
                         dispatch(fetchTodayAttendance({ organizationId, location }));
@@ -214,6 +218,11 @@ export default function EmployeeDashboardPage() {
                     {locationError && (
                         <p role="alert" className="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
                             {locationError}
+                        </p>
+                    )}
+                    {enrollmentNotice && (
+                        <p role="status" className="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+                            {enrollmentNotice}
                         </p>
                     )}
                     {!today?.shift ? (

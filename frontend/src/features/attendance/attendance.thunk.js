@@ -69,7 +69,7 @@ export const enrollMyFace = createAsyncThunk(
     async (image, { rejectWithValue }) => {
         try {
             const response = await attendanceService.enrollFace(image);
-            return response.data?.data?.user;
+            return response.data?.data;
         } catch (error) {
             return rejectWithValue(getErrorMessage(error));
         }

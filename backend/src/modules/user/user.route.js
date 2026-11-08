@@ -103,7 +103,7 @@ authRouter.post('/face/enroll', verifyJWT, receiveImage, enrollFace);
  * @desc    Edit current user's profile (fullName, username)
  * @access  Protected
  */
-authRouter.patch('/profile', verifyJWT, editProfileValidation, editProfile);
+authRouter.patch('/profile', verifyJWT, receiveImage, editProfileValidation, editProfile);
 
 /**
  * @route   PATCH /api/v1/auth/change-password
