@@ -1,5 +1,5 @@
 import { createSlice } from "@reduxjs/toolkit";
-import { loginThunk, registerThunk, fetchProfileThunk, updateProfileThunk, logoutThunk } from "./auth.thunk";
+import { loginThunk, registerThunk, fetchProfileThunk, updateProfileThunk, changePasswordThunk, logoutThunk } from "./auth.thunk";
 
 const initialState = {
     user: null,
@@ -12,11 +12,13 @@ const initialState = {
     registerStatus:      "idle",
     profileStatus:       "idle",
     updateProfileStatus: "idle",
+    changePasswordStatus: "idle",
 
     loginError:         null,
     registerError:      null,
     profileError:       null,
     updateProfileError: null,
+    changePasswordError: null,
 };
 
 const authSlice = createSlice({
@@ -37,6 +39,7 @@ const authSlice = createSlice({
             state.registerError      = null;
             state.profileError       = null;
             state.updateProfileError = null;
+            state.changePasswordError = null;
         },
     },
     extraReducers: (builder) => {
@@ -120,6 +123,20 @@ const authSlice = createSlice({
             .addCase(updateProfileThunk.rejected, (state, { payload }) => {
                 state.updateProfileStatus = "failed";
                 state.updateProfileError  = payload;
+            });
+
+        /* ── Change Password ── */
+        builder
+            .addCase(changePasswordThunk.pending, (state) => {
+                state.changePasswordStatus = "loading";
+                state.changePasswordError = null;
+            })
+            .addCase(changePasswordThunk.fulfilled, (state) => {
+                state.changePasswordStatus = "succeeded";
+            })
+            .addCase(changePasswordThunk.rejected, (state, { payload }) => {
+                state.changePasswordStatus = "failed";
+                state.changePasswordError = payload;
             });
 
         /* ── Logout ── */

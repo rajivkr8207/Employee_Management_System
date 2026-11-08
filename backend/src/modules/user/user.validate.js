@@ -181,5 +181,10 @@ export const changePasswordValidation = [
     .withMessage('New password must be at least 6 characters')
     .matches(/\d/)
     .withMessage('New password must contain at least one number'),
+  body('confirmPassword')
+    .notEmpty()
+    .withMessage('Password confirmation is required')
+    .custom((value, { req }) => value === req.body.newPassword)
+    .withMessage('New password and confirmation do not match'),
   validate,
 ];

@@ -91,6 +91,19 @@ export const updateProfileThunk = createAsyncThunk(
     }
 );
 
+/* ── Change password ── */
+export const changePasswordThunk = createAsyncThunk(
+    "auth/changePassword",
+    async (passwords, { rejectWithValue }) => {
+        try {
+            const { data } = await api.patch("/auth/change-password", passwords);
+            return data?.data || data;
+        } catch (err) {
+            return rejectWithValue(extractError(err));
+        }
+    }
+);
+
 /* ── Logout (calls API to invalidate token if needed) ── */
 export const logoutThunk = createAsyncThunk(
     "auth/logout",

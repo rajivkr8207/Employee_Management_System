@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { User, Mail, Briefcase, Phone, MapPin, Calendar, Camera, LogOut, Shield, Check } from "lucide-react";
+import { User, Mail, Briefcase, Phone, MapPin, Calendar, Camera, LogOut, Shield, Check, KeyRound } from "lucide-react";
 import useAuth from "../hooks/useAuth";
 import Card from "../../../components/ui/Card";
 import Button from "../../../components/ui/Button";
@@ -60,10 +60,11 @@ function RoleBadge({ role }) {
 export default function Profile() {
     const {
         user, profileLoading, updateLoading,
-        updateProfileError, fetchProfile, updateProfile, logout,
+        changePasswordLoading, changePasswordError,
+        updateProfileError, fetchProfile, updateProfile, changePassword, logout,
     } = useAuth();
 
-    const [tab, setTab] = useState("overview");  // "overview" | "edit"
+    const [tab, setTab] = useState("overview");  // "overview" | "edit" | "password"
     const [form, setForm] = useState({
         fullName: user?.fullName || user?.name || "",
         username: user?.username || "",
@@ -73,6 +74,12 @@ export default function Profile() {
         position: user?.position || "",
     });
     const [successMsg, setSuccessMsg] = useState("");
+    const [passwordForm, setPasswordForm] = useState({
+        oldPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+    });
+    const [passwordFormError, setPasswordFormError] = useState("");
 
     /* load latest profile on mount */
     useEffect(() => {
@@ -104,6 +111,26 @@ export default function Profile() {
         if (res?.success) {
             setSuccessMsg("Profile updated successfully!");
             setTab("overview");
+            setTimeout(() => setSuccessMsg(""), 3500);
+        }
+    };
+
+    const handlePasswordChange = async (e) => {
+        e.preventDefault();
+        setPasswordFormError("");
+        if (passwordForm.newPassword.length < 6 || !/\d/.test(passwordForm.newPassword)) {
+            setPasswordFormError("New password must be at least 6 characters and contain a number.");
+            return;
+        }
+        if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+            setPasswordFormError("New password and confirmation do not match.");
+            return;
+        }
+
+        const result = await changePassword(passwordForm);
+        if (result.success) {
+            setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
+            setSuccessMsg("Password changed successfully.");
             setTimeout(() => setSuccessMsg(""), 3500);
         }
     };
@@ -200,7 +227,7 @@ export default function Profile() {
                 <div className="lg:col-span-2">
                     {/* Tab switcher */}
                     <div className="flex gap-1 p-1 bg-[var(--surface-secondary)] rounded-[var(--radius-control)] mb-5 w-fit">
-                        {["overview", "edit"].map((t) => (
+                        {["overview", "edit", "password"].map((t) => (
                             <button
                                 key={t}
                                 type="button"
@@ -212,7 +239,7 @@ export default function Profile() {
                                         : "text-[var(--text-muted)] hover:text-[var(--text-primary)]",
                                 ].join(" ")}
                             >
-                                {t === "edit" ? "Edit Profile" : "Overview"}
+                                {t === "edit" ? "Edit Profile" : t === "password" ? "Change Password" : "Overview"}
                             </button>
                         ))}
                     </div>
@@ -233,7 +260,7 @@ export default function Profile() {
                                 <InfoRow icon={Shield}   label="Role"       value={user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : null} />
                             </Card.Body>
                         </Card>
-                    ) : (
+                    ) : tab === "edit" ? (
                         /* ── Edit form ── */
                         <Card padding="md">
                             <Card.Header withBorder>
@@ -315,10 +342,60 @@ export default function Profile() {
                                 </form>
                             </Card.Body>
                         </Card>
+                    ) : (
+                        <Card padding="md">
+                            <Card.Header withBorder>
+                                <Card.Title>Change Password</Card.Title>
+                            </Card.Header>
+                            <Card.Body>
+                                <p className="mb-5 text-sm text-[var(--text-secondary)]">
+                                Enter your current password, then choose and confirm a new password.
+                                </p>
+                                {(passwordFormError || changePasswordError) && (
+                                <div role="alert" className="mb-5 px-4 py-3 rounded-[var(--radius-control)] bg-[var(--danger-soft)] border border-[var(--danger)]/30">
+                                    <p className="text-sm text-[var(--danger)]">{passwordFormError || changePasswordError}</p>
+                                </div>
+                                )}
+                                <form onSubmit={handlePasswordChange} className="space-y-4">
+                                {[
+                                    { name: "oldPassword", label: "Current password", autocomplete: "current-password" },
+                                    { name: "newPassword", label: "New password", autocomplete: "new-password" },
+                                    { name: "confirmPassword", label: "Confirm new password", autocomplete: "new-password" },
+                                ].map(({ name, label, autocomplete }) => (
+                                    <div key={name} className="flex flex-col gap-1.5">
+                                        <label htmlFor={name} className="text-sm font-medium text-[var(--text-primary)]">{label}</label>
+                                        <div className="relative flex items-center">
+                                            <span className="absolute left-3 pointer-events-none text-[var(--text-muted)]"><KeyRound size={15} /></span>
+                                            <input
+                                                id={name}
+                                                name={name}
+                                                type="password"
+                                                autoComplete={autocomplete}
+                                                required
+                                                value={passwordForm[name]}
+                                                onChange={(e) => {
+                                                    setPasswordForm((prev) => ({ ...prev, [name]: e.target.value }));
+                                                    setPasswordFormError("");
+                                                }}
+                                                className={`${inputCls} pl-9`}
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
+                                <p className="text-xs text-[var(--text-muted)]">
+                                    Use at least 6 characters and include at least one number.
+                                </p>
+                                <div className="flex justify-end pt-2">
+                                    <Button type="submit" icon={KeyRound} loading={changePasswordLoading}>
+                                        Update Password
+                                    </Button>
+                                </div>
+                                </form>
+                            </Card.Body>
+                        </Card>
                     )}
                 </div>
             </div>
         </div>
     );
 }
-

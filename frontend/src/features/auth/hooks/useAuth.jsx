@@ -6,6 +6,7 @@ import {
     registerThunk,
     fetchProfileThunk,
     updateProfileThunk,
+    changePasswordThunk,
     logoutThunk,
 } from "../auth.thunk";
 import { clearAuth, clearErrors } from "../auth.slice";
@@ -73,6 +74,18 @@ export default function useAuth() {
         [dispatch]
     );
 
+    /* ── Change Password ── */
+    const changePassword = useCallback(
+        async (passwords) => {
+            const result = await dispatch(changePasswordThunk(passwords));
+            if (changePasswordThunk.fulfilled.match(result)) {
+                return { success: true };
+            }
+            return { success: false, error: result.payload };
+        },
+        [dispatch]
+    );
+
     /* ── Logout ── */
     const logout = useCallback(
         async () => {
@@ -104,6 +117,7 @@ export default function useAuth() {
         registerLoading: auth.registerStatus === "loading",
         profileLoading:  auth.profileStatus  === "loading",
         updateLoading:   auth.updateProfileStatus === "loading",
+        changePasswordLoading: auth.changePasswordStatus === "loading",
 
         /* success flags */
         loginSuccess:   auth.loginStatus   === "succeeded",
@@ -115,12 +129,14 @@ export default function useAuth() {
         registerError:      auth.registerError,
         profileError:       auth.profileError,
         updateProfileError: auth.updateProfileError,
+        changePasswordError: auth.changePasswordError,
 
         /* actions */
         login,
         register,
         fetchProfile,
         updateProfile,
+        changePassword,
         logout,
         clearSession,
         clearAllErrors,
