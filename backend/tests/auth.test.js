@@ -230,5 +230,59 @@ describe('Auth API', () => {
       expect(res.statusCode).toEqual(404);
       expect(res.body.success).toBe(false);
     });
+
+    it('changes the password when the current password and confirmation are valid', async () => {
+      const user = await UserModel.findOne({ email: validUser.email });
+      const response = await request(app)
+        .patch('/api/v1/auth/change-password')
+        .set('Cookie', `accessToken=${user.generateAccessToken()}`)
+        .send({
+          oldPassword: validUser.password,
+          newPassword: 'NewPassword456',
+          confirmPassword: 'NewPassword456',
+        });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.body.success).toBe(true);
+
+      const updatedUser = await UserModel.findById(user.id).select(
+        '+password +refreshTokenVersion',
+      );
+      expect(await updatedUser.comparePassword('NewPassword456')).toBe(true);
+      expect(updatedUser.refreshTokenVersion).toBe(1);
+    });
+
+    it('rejects a password change when the confirmation does not match', async () => {
+      const user = await UserModel.findOne({ email: validUser.email });
+      const response = await request(app)
+        .patch('/api/v1/auth/change-password')
+        .set('Cookie', `accessToken=${user.generateAccessToken()}`)
+        .send({
+          oldPassword: validUser.password,
+          newPassword: 'NewPassword456',
+          confirmPassword: 'DifferentPassword789',
+        });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.body.success).toBe(false);
+      const unchangedUser = await UserModel.findById(user.id).select('+password');
+      expect(await unchangedUser.comparePassword(validUser.password)).toBe(true);
+    });
+
+    it('rejects a password change when the current password is incorrect', async () => {
+      const user = await UserModel.findOne({ email: validUser.email });
+      const response = await request(app)
+        .patch('/api/v1/auth/change-password')
+        .set('Cookie', `accessToken=${user.generateAccessToken()}`)
+        .send({
+          oldPassword: 'IncorrectPassword123',
+          newPassword: 'NewPassword456',
+          confirmPassword: 'NewPassword456',
+        });
+
+      expect(response.statusCode).toBe(401);
+      const unchangedUser = await UserModel.findById(user.id).select('+password');
+      expect(await unchangedUser.comparePassword(validUser.password)).toBe(true);
+    });
   });
 });
