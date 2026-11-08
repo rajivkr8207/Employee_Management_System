@@ -342,7 +342,7 @@ export const editUserProfile = async (
     id,
     { $set: updates },
     {
-      new: true,
+      returnDocument: 'after',
       runValidators: true,
     },
   );
