@@ -1,49 +1,22 @@
-import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { userVerificationService } from "./services/userVerificationService";
+import { createSlice } from "@reduxjs/toolkit";
+import {
+    fetchUsersThunk,
+    rejectUserThunk,
+    verifyUserThunk,
+} from "./userVerification.thunk";
 
-export const fetchUsersThunk = createAsyncThunk(
-    "userVerification/fetchUsers",
-    async (tab = "all", { rejectWithValue }) => {
-        try {
-            return await userVerificationService.getUsers(tab);
-        } catch (err) {
-            return rejectWithValue(err.message || "Failed to fetch users");
-        }
-    }
-);
-
-export const verifyUserThunk = createAsyncThunk(
-    "userVerification/verifyUser",
-    async (userId, { rejectWithValue }) => {
-        try {
-            return await userVerificationService.verifyUser(userId);
-        } catch (err) {
-            return rejectWithValue(err.message || "Failed to verify user");
-        }
-    }
-);
-
-export const rejectUserThunk = createAsyncThunk(
-    "userVerification/rejectUser",
-    async ({ userId, reason }, { rejectWithValue }) => {
-        try {
-            return await userVerificationService.rejectUser(userId, reason);
-        } catch (err) {
-            return rejectWithValue(err.message || "Failed to reject user");
-        }
-    }
-);
+const initialState = {
+    users: [],
+    selectedUser: null,
+    activeTab: "all",
+    loading: false,
+    actionLoading: false,
+    error: null,
+};
 
 const userVerificationSlice = createSlice({
     name: "userVerification",
-    initialState: {
-        users: [],
-        selectedUser: null,
-        activeTab: "all", // all | pending | verified | rejected
-        loading: false,
-        actionLoading: false,
-        error: null,
-    },
+    initialState,
     reducers: {
         setActiveTab: (state, action) => {
             state.activeTab = action.payload;
@@ -57,7 +30,6 @@ const userVerificationSlice = createSlice({
     },
     extraReducers: (builder) => {
         builder
-            // Fetch users
             .addCase(fetchUsersThunk.pending, (state) => {
                 state.loading = true;
                 state.error = null;
@@ -70,38 +42,34 @@ const userVerificationSlice = createSlice({
                 state.loading = false;
                 state.error = action.payload;
             })
-            // Verify
             .addCase(verifyUserThunk.pending, (state) => {
                 state.actionLoading = true;
             })
             .addCase(verifyUserThunk.fulfilled, (state, action) => {
                 state.actionLoading = false;
                 const updated = action.payload;
-                state.users = state.users.map((u) => (u.id === updated.id ? updated : u));
-                if (state.selectedUser?.id === updated.id) {
-                    state.selectedUser = updated;
-                }
+                state.users = state.users.map((user) => (user.id === updated.id ? updated : user));
+                if (state.selectedUser?.id === updated.id) state.selectedUser = updated;
             })
             .addCase(verifyUserThunk.rejected, (state, action) => {
                 state.actionLoading = false;
                 state.error = action.payload;
             })
-            // Reject
             .addCase(rejectUserThunk.pending, (state) => {
                 state.actionLoading = true;
             })
             .addCase(rejectUserThunk.fulfilled, (state, action) => {
                 state.actionLoading = false;
                 const updated = action.payload;
-                state.users = state.users.map((u) => (u.id === updated.id ? updated : u));
-                if (state.selectedUser?.id === updated.id) {
-                    state.selectedUser = updated;
-                }
+                state.users = state.users.map((user) => (user.id === updated.id ? updated : user));
+                if (state.selectedUser?.id === updated.id) state.selectedUser = updated;
             })
             .addCase(rejectUserThunk.rejected, (state, action) => {
                 state.actionLoading = false;
                 state.error = action.payload;
-            });
+            })
+            .addCase("auth/clearAuth", () => initialState)
+            .addCase("auth/logout/fulfilled", () => initialState);
     },
 });
 

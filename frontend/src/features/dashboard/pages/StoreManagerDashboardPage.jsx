@@ -5,8 +5,8 @@ import { Clock3, MapPin, Users } from "lucide-react";
 import Badge from "../../../components/ui/Badge";
 import Button from "../../../components/ui/Button";
 import Card from "../../../components/ui/Card";
-import { fetchEmployees } from "../../employees/employeeSlice";
-import { fetchMyStores } from "../../store/storeSlice";
+import { fetchEmployees } from "../../employees/employees.thunk";
+import { fetchMyStores } from "../../store/store.thunk";
 
 const employeeName = (employee) =>
     employee.userId?.fullName || employee.userId?.username || "Unnamed employee";

@@ -4,7 +4,7 @@ import Card from "../../../components/ui/Card";
 import Badge from "../../../components/ui/Badge";
 import Button from "../../../components/ui/Button";
 import SearchInput from "../../../components/Common/SearchInput";
-import { fetchAdminEmployeesThunk } from "../adminSlice";
+import { fetchAdminEmployeesThunk } from "../admin.thunk";
 
 function roleLabel(role) {
     if (role === "manager") return "Store Manager";

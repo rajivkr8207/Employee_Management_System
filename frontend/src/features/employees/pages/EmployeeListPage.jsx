@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Plus, Users, Search, Trash2, Eye } from "lucide-react";
 import { toast } from "react-toastify";
-import { fetchEmployees, createEmployee, deleteEmployee } from "../employeeSlice";
-import { fetchMyStores } from "../../store/storeSlice";
+import { fetchEmployees, createEmployee, deleteEmployee } from "../employees.thunk";
+import { fetchMyStores } from "../../store/store.thunk";
 
 const roleBadge = {
   manager: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",

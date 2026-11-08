@@ -6,7 +6,7 @@ import Card from "../../../components/ui/Card";
 import Badge from "../../../components/ui/Badge";
 import Button from "../../../components/ui/Button";
 import SearchInput from "../../../components/Common/SearchInput";
-import { fetchAdminStoresThunk } from "../adminSlice";
+import { fetchAdminStoresThunk } from "../admin.thunk";
 
 function formatStatus(status) {
     return status === "active" ? "Active" : status === "inactive" ? "Inactive" : status || "Unknown";

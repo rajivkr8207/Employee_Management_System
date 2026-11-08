@@ -185,10 +185,14 @@ userSchema.methods.setRefreshTokenHash = function setRefreshTokenHash(token) {
 
 userSchema.methods.compareRefreshToken = function compareRefreshToken(token) {
   if (!token || !this.refreshTokenHash) return false;
-  const incomingHash = Buffer.from(this.hashToken(token), 'hex');
-  const storedHash = Buffer.from(this.refreshTokenHash, 'hex');
+  if (this.refreshTokenHash === this.hashToken(token)) return true;
+
+  // Accept tokens stored before refresh-token hashing was introduced; refresh rotates them to a hash.
+  const incomingToken = Buffer.from(String(token));
+  const storedToken = Buffer.from(String(this.refreshTokenHash));
   return (
-    incomingHash.length === storedHash.length && crypto.timingSafeEqual(incomingHash, storedHash)
+    incomingToken.length === storedToken.length &&
+    crypto.timingSafeEqual(incomingToken, storedToken)
   );
 };
 

@@ -6,7 +6,7 @@ import Card from "../../../components/ui/Card";
 import Badge from "../../../components/ui/Badge";
 import Button from "../../../components/ui/Button";
 import SearchInput from "../../../components/Common/SearchInput";
-import { fetchAdminUsersThunk } from "../adminSlice";
+import { fetchAdminUsersThunk } from "../admin.thunk";
 
 const roleLabels = {
     admin: "Administrator",

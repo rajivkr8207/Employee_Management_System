@@ -13,7 +13,7 @@ import {
     Activity,
     Sparkles,
 } from "lucide-react";
-import { fetchAdminDashboardStatsThunk } from "../../admin/adminSlice";
+import { fetchAdminDashboardStatsThunk } from "../../admin/admin.thunk";
 import Card from "../../../components/ui/Card";
 import Badge from "../../../components/ui/Badge";
 import Button from "../../../components/ui/Button";

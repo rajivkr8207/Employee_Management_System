@@ -27,7 +27,7 @@ import {
   createStoreManager,
   updateStoreManager,
   deleteStoreManager,
-} from "../storeSlice";
+} from "../store.thunk";
 
 const statusColors = {
   active: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",

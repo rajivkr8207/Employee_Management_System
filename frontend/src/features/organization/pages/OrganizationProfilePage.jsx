@@ -22,9 +22,9 @@ import {
   fetchMyOrganization,
   createOrganization,
   updateMyOrganization,
-} from "../organizationSlice";
-import { fetchMyStores } from "../../store/storeSlice";
-import { fetchEmployees } from "../../employees/employeeSlice";
+} from "../organization.thunk";
+import { fetchMyStores } from "../../store/store.thunk";
+import { fetchEmployees } from "../../employees/employees.thunk";
 
 const verificationStatusBadges = {
   approved: {

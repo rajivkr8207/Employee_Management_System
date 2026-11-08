@@ -7,9 +7,8 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 
 export const verifyJWT = asyncHandler(async (req, res, next) => {
   const token =
-    req.cookies?.accessToken ||
     req.header('Authorization')?.replace('Bearer ', '') ||
-    req.headers?.authorization?.replace('Bearer ', '');
+    req.cookies?.accessToken;
 
   if (!token) {
     throw new ApiError(401, 'Authentication is required');
@@ -37,7 +36,13 @@ export const verifyJWT = asyncHandler(async (req, res, next) => {
     throw new ApiError(403, 'Account is awaiting administrator approval');
   }
 
-  req.user = { id: user.id, role: user.role, email: user.email, isApproved: user.isApproved };
+  req.user = {
+    id: user.id,
+    fullName: user.fullName,
+    role: user.role,
+    email: user.email,
+    isApproved: user.isApproved,
+  };
   return next();
 });
 

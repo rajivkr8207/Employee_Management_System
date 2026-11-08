@@ -18,10 +18,12 @@ import {
     fetchStoresThunk,
     approveStoreThunk,
     rejectStoreThunk,
+} from "../storeVerification.thunk";
+import {
     setActiveTab,
     setSelectedStore,
     clearSelectedStore,
-} from "../storeVerificationSlice";
+} from "../storeVerification.slice";
 import Card from "../../../components/ui/Card";
 import Button from "../../../components/ui/Button";
 import Badge from "../../../components/ui/Badge";

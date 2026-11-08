@@ -9,9 +9,11 @@ import shiftRouter from './modules/shift/shift.route.js';
 import attendanceRouter from './modules/attendence/attendence.route.js';
 import leaveRouter from './modules/leave/leave.route.js';
 import adminRouter from './modules/admin/admin.route.js';
+import { auditActivity } from './modules/activityLog/activityLog.middleware.js';
 
 const AllRoutes = express.Router();
 
+AllRoutes.use(auditActivity);
 AllRoutes.use('/health', healthRoute);
 AllRoutes.use('/organizations', organizationRouter);
 AllRoutes.use('/stores', storeRouter);

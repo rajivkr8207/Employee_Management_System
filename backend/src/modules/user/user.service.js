@@ -1,7 +1,7 @@
 import User from './user.model.js';
 import { ApiError } from '../../utils/ApiError.js';
 import jwt from 'jsonwebtoken';
-import Config from '../../config/Config.js';
+import Config from '../../config/config.js';
 import { MailService } from '../../services/mail.service.js';
 import StoreAdminInvitation from './store-admin-invitation.model.js';
 import crypto from 'crypto';
@@ -241,7 +241,7 @@ export const loginUser = async ({ identifier, password }) => {
   user.refreshTokenVersion += 1;
   const accessToken = user.generateAccessToken();
   const refreshToken = user.generateRefreshToken();
-  user.refreshTokenHash = refreshToken;
+  user.setRefreshTokenHash(refreshToken);
   user.lastLoginAt = new Date();
   await user.save();
 

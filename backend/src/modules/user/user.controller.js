@@ -136,7 +136,7 @@ export const login = asyncHandler(async (req, res) => {
       ...cookieOptions,
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     })
-    .json(new ApiResponse(200, { user, accessToken, refreshToken }, 'Login successful'));
+    .json(new ApiResponse(200, { user, accessToken }, 'Login successful'));
 });
 
 // ─────────────────────────────────────────────
@@ -171,7 +171,7 @@ export const refreshToken = asyncHandler(async (req, res) => {
     .json(
       new ApiResponse(
         200,
-        { accessToken, refreshToken: newRefreshToken },
+        { accessToken },
         'Access token refreshed',
       ),
     );

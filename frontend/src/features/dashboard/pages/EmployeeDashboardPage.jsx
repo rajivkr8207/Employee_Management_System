@@ -14,13 +14,13 @@ import {
 } from "lucide-react";
 import Badge from "../../../components/ui/Badge";
 import Card from "../../../components/ui/Card";
-import { fetchMyEmployee } from "../../employees/employeeSlice";
+import { fetchMyEmployee } from "../../employees/employees.thunk";
 import {
     enrollMyFace,
     fetchTodayAttendance,
     recordCheckIn,
     recordCheckOut,
-} from "../../attendance/attendanceSlice";
+} from "../../attendance/attendance.thunk";
 import FaceAttendanceModal from "../../attendance/components/FaceAttendanceModal";
 
 const getOrganizationId = (value) => (typeof value === "string" ? value : value?._id);
