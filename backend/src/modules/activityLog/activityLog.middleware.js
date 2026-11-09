@@ -66,7 +66,10 @@ const getAction = (req) => {
 
 const getMessage = (body, outcome) => {
   const message = typeof body?.message === 'string' ? body.message : '';
-  const normalized = message.replace(/[\r\n\t]+/g, ' ').trim().slice(0, 300);
+  const normalized = message
+    .replace(/[\r\n\t]+/g, ' ')
+    .trim()
+    .slice(0, 300);
   return normalized || (outcome === 'success' ? 'Action completed successfully' : 'Action failed');
 };
 
@@ -90,7 +93,10 @@ export const auditActivity = (req, res, next) => {
       actorRole: req.user.role,
       action: getAction(req),
       method: req.method,
-      route: req.originalUrl.split('?')[0].replace(/^\/api\/v\d+/, '').slice(0, 240),
+      route: req.originalUrl
+        .split('?')[0]
+        .replace(/^\/api\/v\d+/, '')
+        .slice(0, 240),
       outcome,
       statusCode: res.statusCode,
       message: getMessage(body, outcome),

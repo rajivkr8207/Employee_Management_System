@@ -1,6 +1,6 @@
 import Redis from 'ioredis';
 import logger from './logger.js';
-import Config from './Config.js';
+import Config from './config.js';
 
 const redisOptions = {
   host: Config.redis_host || undefined,

@@ -282,7 +282,9 @@ describe('Shift API', () => {
     expect(outOfScope.statusCode).toBe(403);
 
     const list = await request(app)
-      .get(`/api/v1/shifts/assignments?organizationId=${organization.id}&storeId=${store.id}&date=2026-07-14`)
+      .get(
+        `/api/v1/shifts/assignments?organizationId=${organization.id}&storeId=${store.id}&date=2026-07-14`,
+      )
       .set(headers);
     expect(list.statusCode).toBe(200);
     expect(list.body.data.assignments).toHaveLength(1);

@@ -2,7 +2,7 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: ["main", "master", "frontend"]
+    branches: ["main", "master"]
   pull_request:
     branches: ["main", "master"]
 
@@ -33,16 +33,19 @@ jobs:
         run: npm ci
 
       - name: Run Tests
-        run: npm test
+        run: npm test 
         env:
           NODE_ENV: test
           PORT: ${{ secrets.PORT }}
-          MONGO_URI: ${{ secrets.MONGO_URI }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
+          JWT_ACCESS_EXPIRES_IN: ${{ secrets.JWT_ACCESS_EXPIRES_IN }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          JWT_REFRESH_EXPIRES_IN: ${{ secrets.JWT_REFRESH_EXPIRES_IN }}
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
-          MAIL_EMAIL: ${{ secrets.MAIL_EMAIL }}
+          SMTP_EMAIL: ${{ secrets.SMTP_EMAIL }}
           FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
           IMAGE_KIT: ${{ secrets.IMAGE_KIT }}
          

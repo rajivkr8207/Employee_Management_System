@@ -32,9 +32,8 @@ jest.unstable_mockModule('../src/services/faceRecognition.service.js', () => ({
 
 const { app } = await import('../src/app.js');
 const { default: UserModel } = await import('../src/modules/user/user.model.js');
-const { default: StoreAdminInvitation } = await import(
-  '../src/modules/user/store-admin-invitation.model.js'
-);
+const { default: StoreAdminInvitation } =
+  await import('../src/modules/user/store-admin-invitation.model.js');
 const { connectTestDB, closeTestDB, clearTestDB } = await import('./setup.js');
 
 beforeAll(async () => {
@@ -92,9 +91,7 @@ describe('Auth API', () => {
         });
 
       expect(response.statusCode).toBe(201);
-      expect(response.body.data.user.avatar).toBe(
-        'https://ik.imagekit.io/test/enrolled-face.jpg',
-      );
+      expect(response.body.data.user.avatar).toBe('https://ik.imagekit.io/test/enrolled-face.jpg');
       const savedUser = await UserModel.findOne({ username: 'invitedadmin' }).select(
         '+faceEmbedding',
       );

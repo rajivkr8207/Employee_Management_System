@@ -51,13 +51,7 @@ const mapDuplicateKeyError = (error) => {
 };
 
 export const createEmployee = async (employeeData, requesterId) => {
-  const {
-    storeId,
-    role = 'employee',
-    membershipStatus = 'active',
-    userId,
-    user,
-  } = employeeData;
+  const { storeId, role = 'employee', membershipStatus = 'active', userId, user } = employeeData;
   let { organizationId, storeIds } = employeeData;
 
   const requester = await User.findById(requesterId);

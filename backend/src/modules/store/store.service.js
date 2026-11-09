@@ -305,11 +305,7 @@ const getStoreManagerMembership = async (storeId, managerId, storeAdminId) => {
 };
 
 export const setStoreManagerStatus = async (storeId, managerId, isActive, storeAdminId) => {
-  const { store, membership } = await getStoreManagerMembership(
-    storeId,
-    managerId,
-    storeAdminId,
-  );
+  const { store, membership } = await getStoreManagerMembership(storeId, managerId, storeAdminId);
   const manager = await User.findOne({
     _id: managerId,
     role: ROLES.MANAGER,
@@ -332,11 +328,7 @@ export const setStoreManagerStatus = async (storeId, managerId, isActive, storeA
 };
 
 export const removeStoreManager = async (storeId, managerId, storeAdminId) => {
-  const { store, membership } = await getStoreManagerMembership(
-    storeId,
-    managerId,
-    storeAdminId,
-  );
+  const { store, membership } = await getStoreManagerMembership(storeId, managerId, storeAdminId);
 
   membership.storeIds = membership.storeIds.filter(
     (assignedStoreId) => assignedStoreId.toString() !== store._id.toString(),
@@ -348,10 +340,7 @@ export const removeStoreManager = async (storeId, managerId, storeAdminId) => {
     { organizationId: store.organizationId, storeId: store._id, userId: managerId },
     { $set: { status: 'terminated' } },
   );
-  await StoreModel.updateOne(
-    { _id: store._id, managerId },
-    { $unset: { managerId: 1 } },
-  );
+  await StoreModel.updateOne({ _id: store._id, managerId }, { $unset: { managerId: 1 } });
 
   const hasActiveAssignment = await MembershipModel.exists({
     userId: managerId,
