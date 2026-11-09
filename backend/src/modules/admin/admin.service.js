@@ -17,11 +17,7 @@ const getUserStatus = (user) => {
   return 'active';
 };
 
-export const listAdminUsers = () =>
-  User.find()
-    .select(userFields)
-    .sort({ createdAt: -1 })
-    .lean();
+export const listAdminUsers = () => User.find().select(userFields).sort({ createdAt: -1 }).lean();
 
 export const getAdminActivityLogs = (filters) => listActivityLogs(filters);
 
@@ -34,9 +30,7 @@ export const listAdminStores = async () => {
       .lean(),
     EmployeeModel.aggregate([{ $group: { _id: '$storeId', count: { $sum: 1 } } }]),
   ]);
-  const countsByStoreId = new Map(
-    employeeCounts.map(({ _id, count }) => [_id.toString(), count]),
-  );
+  const countsByStoreId = new Map(employeeCounts.map(({ _id, count }) => [_id.toString(), count]));
 
   return stores.map((store) => ({
     ...store,
@@ -112,9 +106,7 @@ export const listAdminManagers = async (statusFilter = 'all') => {
   const managers = users.map((user) => {
     const employee = employeeByUserId.get(user._id.toString());
     const store = employee?.storeId;
-    const status =
-      user.approvalStatus ||
-      (user.isApproved ? 'approved' : 'pending');
+    const status = user.approvalStatus || (user.isApproved ? 'approved' : 'pending');
     return {
       id: user._id.toString(),
       fullName: user.fullName,
@@ -205,10 +197,7 @@ export const getAdminDashboardStats = async () => {
     User.countDocuments(),
     User.countDocuments({ isVerified: true }),
     User.countDocuments({
-      $or: [
-        { approvalStatus: 'pending' },
-        { approvalStatus: null, isApproved: false },
-      ],
+      $or: [{ approvalStatus: 'pending' }, { approvalStatus: null, isApproved: false }],
     }),
     User.countDocuments({ isBlocked: true }),
     User.countDocuments({ isActive: true, isBlocked: false }),

@@ -1,5 +1,5 @@
 import winston from 'winston';
-import Config from './Config.js';
+import Config from './config.js';
 
 const logLevels = {
   error: 0,

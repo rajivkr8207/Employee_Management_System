@@ -1,4 +1,4 @@
-import Config from '../config/Config.js';
+import Config from '../config/config.js';
 import { getMailTransporter } from '../config/mail.js';
 
 export class MailService {

@@ -68,7 +68,10 @@ const createEmployeeSetup = async () => {
     designation: 'Cashier',
     salary: 25000,
   });
-  await UserModel.updateOne({ _id: employeeUser.id }, { $set: { faceEmbedding: testFaceEmbedding } });
+  await UserModel.updateOne(
+    { _id: employeeUser.id },
+    { $set: { faceEmbedding: testFaceEmbedding } },
+  );
   await MembershipModel.create({
     userId: employeeUser.id,
     organizationId: organization.id,
@@ -232,9 +235,12 @@ describe('Attendance API', () => {
       .field('organizationId', organization.id)
       .field('lat', '19')
       .field('lng', '72')
-      .attach('image', fileURLToPath(
-        new URL('../node_modules/@vladmandic/face-api/demo/sample1.jpg', import.meta.url),
-      ));
+      .attach(
+        'image',
+        fileURLToPath(
+          new URL('../node_modules/@vladmandic/face-api/demo/sample1.jpg', import.meta.url),
+        ),
+      );
 
     expect(response.statusCode).toBe(400);
     expect(response.body.message).toMatch(/exactly one face/i);

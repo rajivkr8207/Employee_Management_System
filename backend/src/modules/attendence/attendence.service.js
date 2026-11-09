@@ -8,7 +8,10 @@ import { EmployeeModel } from '../employee/employee.model.js';
 import { ShiftAssignmentModel } from '../shift/shift-assignment.model.js';
 import User from '../user/user.model.js';
 import { AttendanceModel } from './attendence.model.js';
-import { createFaceEmbedding, matchesFaceEmbedding } from '../../services/faceRecognition.service.js';
+import {
+  createFaceEmbedding,
+  matchesFaceEmbedding,
+} from '../../services/faceRecognition.service.js';
 
 const attendanceRoles = ['owner', 'store_admin', 'manager'];
 const attendanceEmployeeFields = 'employeeCode designation userId';
@@ -258,7 +261,10 @@ const assertAttendanceActionAllowed = async ({
     throw new ApiError(400, context.reason || 'Attendance is not available at this time');
   }
   if (!context.faceEnrolled) {
-    throw new ApiError(409, 'Enroll your face from the employee dashboard before taking attendance');
+    throw new ApiError(
+      409,
+      'Enroll your face from the employee dashboard before taking attendance',
+    );
   }
   const candidateEmbedding = await createFaceEmbedding(imageBuffer);
   if (!matchesFaceEmbedding(candidateEmbedding, context.faceEmbedding)) {

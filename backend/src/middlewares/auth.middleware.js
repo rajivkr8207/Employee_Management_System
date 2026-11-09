@@ -6,9 +6,7 @@ import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 export const verifyJWT = asyncHandler(async (req, res, next) => {
-  const token =
-    req.header('Authorization')?.replace('Bearer ', '') ||
-    req.cookies?.accessToken;
+  const token = req.header('Authorization')?.replace('Bearer ', '') || req.cookies?.accessToken;
 
   if (!token) {
     throw new ApiError(401, 'Authentication is required');
@@ -29,8 +27,7 @@ export const verifyJWT = asyncHandler(async (req, res, next) => {
 
   // Allow pending accounts to access /auth/profile and /auth/logout
   const isProfileOrLogout =
-    req.originalUrl?.includes('/auth/profile') ||
-    req.originalUrl?.includes('/auth/logout');
+    req.originalUrl?.includes('/auth/profile') || req.originalUrl?.includes('/auth/logout');
 
   if (!user.isApproved && !isProfileOrLogout) {
     throw new ApiError(403, 'Account is awaiting administrator approval');

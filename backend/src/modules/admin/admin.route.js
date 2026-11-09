@@ -44,7 +44,11 @@ adminRouter.patch(
 adminRouter.patch(
   '/store-verifications/:storeId/reject',
   param('storeId').isMongoId().withMessage('A valid store ID is required'),
-  body('reason').trim().notEmpty().isLength({ max: 500 }).withMessage('A rejection reason is required'),
+  body('reason')
+    .trim()
+    .notEmpty()
+    .isLength({ max: 500 })
+    .withMessage('A rejection reason is required'),
   validate,
   rejectStore,
 );
@@ -64,7 +68,11 @@ adminRouter.patch(
 adminRouter.patch(
   '/manager-verifications/:managerId/reject',
   param('managerId').isMongoId().withMessage('A valid manager ID is required'),
-  body('reason').trim().notEmpty().isLength({ max: 500 }).withMessage('A rejection reason is required'),
+  body('reason')
+    .trim()
+    .notEmpty()
+    .isLength({ max: 500 })
+    .withMessage('A rejection reason is required'),
   validate,
   rejectManager,
 );

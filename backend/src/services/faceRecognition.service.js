@@ -46,17 +46,26 @@ export const createFaceEmbedding = async (imageBuffer) => {
   }
 
   const faces = await faceapi
-    .detectAllFaces(image, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 }))
+    .detectAllFaces(
+      image,
+      new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 }),
+    )
     .withFaceLandmarks()
     .withFaceDescriptors();
-  if (faces.length === 0) throw new ApiError(400, 'No face was detected. Use a clear, front-facing photo');
+  if (faces.length === 0)
+    throw new ApiError(400, 'No face was detected. Use a clear, front-facing photo');
   if (faces.length !== 1) throw new ApiError(400, 'The image must contain exactly one face');
 
   return Array.from(faces[0].descriptor);
 };
 
 export const matchesFaceEmbedding = (candidate, enrolled) => {
-  if (!Array.isArray(candidate) || !Array.isArray(enrolled) || candidate.length !== 128 || enrolled.length !== 128) {
+  if (
+    !Array.isArray(candidate) ||
+    !Array.isArray(enrolled) ||
+    candidate.length !== 128 ||
+    enrolled.length !== 128
+  ) {
     return false;
   }
   return faceapi.euclideanDistance(candidate, enrolled) <= matchThreshold;

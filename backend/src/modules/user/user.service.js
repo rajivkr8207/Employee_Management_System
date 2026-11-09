@@ -148,10 +148,7 @@ export const registerStoreAdmin = async ({
     isActive: true,
   });
 
-  await StoreAdminInvitation.updateOne(
-    { _id: invitation._id },
-    { $set: { usedAt: new Date() } },
-  );
+  await StoreAdminInvitation.updateOne({ _id: invitation._id }, { $set: { usedAt: new Date() } });
 
   return { user };
 };
@@ -182,7 +179,11 @@ export const approveStoreAdmin = async (id) => {
   }
 
   try {
-    await new MailService().SendAccountApprovedMail(user.email, user.fullName, 'Store Administrator');
+    await new MailService().SendAccountApprovedMail(
+      user.email,
+      user.fullName,
+      'Store Administrator',
+    );
   } catch (err) {
     console.error('[Approval Mail Error]:', err.message);
   }

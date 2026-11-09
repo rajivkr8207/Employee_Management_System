@@ -183,9 +183,7 @@ describe('Store API', () => {
         status: 'active',
       });
 
-      const list = await request(app)
-        .get('/api/v1/stores')
-        .set('Cookie', `accessToken=${token}`);
+      const list = await request(app).get('/api/v1/stores').set('Cookie', `accessToken=${token}`);
       expect(list.statusCode).toBe(200);
       expect(list.body.data.stores.map((store) => store._id)).toEqual([assignedStore.id]);
 
@@ -201,7 +199,10 @@ describe('Store API', () => {
       const { user: owner, token: ownerToken } = await createUser({
         username: 'managerworkflowowner',
       });
-      const organization = await createApprovedOrganization(owner.id, 'managerworkflow@example.com');
+      const organization = await createApprovedOrganization(
+        owner.id,
+        'managerworkflow@example.com',
+      );
       const store = await StoreModel.create({
         ...storeDetails,
         organizationId: organization.id,
@@ -268,7 +269,9 @@ describe('Store API', () => {
         .delete(`/api/v1/stores/${store.id}/managers/${managerId}`)
         .set('Cookie', `accessToken=${ownerToken}`);
       expect(removed.statusCode).toBe(200);
-      expect(await EmployeeModel.exists({ userId: managerId, status: 'terminated' })).not.toBeNull();
+      expect(
+        await EmployeeModel.exists({ userId: managerId, status: 'terminated' }),
+      ).not.toBeNull();
       expect(await MembershipModel.exists({ userId: managerId, storeIds: store.id })).toBeNull();
 
       const removedManagerLogin = await request(app).post('/api/v1/auth/login').send({

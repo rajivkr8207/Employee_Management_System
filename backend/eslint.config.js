@@ -13,7 +13,7 @@ export default [
       'tests',
       'src/middlewares/error.middlewares.js',
       'src/app.middleware.js',
-      'src/docs/*'
+      'src/docs/*',
     ],
   },
 

@@ -51,13 +51,7 @@ const mapDuplicateKeyError = (error) => {
 };
 
 export const createEmployee = async (employeeData, requesterId) => {
-  const {
-    storeId,
-    role = 'employee',
-    membershipStatus = 'active',
-    userId,
-    user,
-  } = employeeData;
+  const { storeId, role = 'employee', membershipStatus = 'active', userId, user } = employeeData;
   let { organizationId, storeIds } = employeeData;
 
   const requester = await User.findById(requesterId);
@@ -180,7 +174,7 @@ export const createEmployee = async (employeeData, requesterId) => {
   // Send onboarding credentials email
   if (createdUser && user?.password) {
     try {
-      const Config = (await import('../../config/Config.js')).default;
+      const Config = (await import('../../config/config.js')).default;
       const { MailService } = await import('../../services/mail.service.js');
       await new MailService().SendStaffCredentialsMail(
         selectedUser.email,

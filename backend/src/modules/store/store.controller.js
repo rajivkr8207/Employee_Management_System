@@ -62,10 +62,6 @@ export const updateManagerStatusForStore = asyncHandler(async (req, res) => {
 });
 
 export const removeManagerFromStore = asyncHandler(async (req, res) => {
-  const result = await removeStoreManager(
-    req.params.storeId,
-    req.params.managerId,
-    req.user.id,
-  );
+  const result = await removeStoreManager(req.params.storeId, req.params.managerId, req.user.id);
   return res.status(200).json(new ApiResponse(200, result, 'Manager removed from store'));
 });

@@ -1,22 +1,22 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 const attendanceSchema = new mongoose.Schema(
   {
     organizationId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Organization",
+      ref: 'Organization',
       required: true,
       index: true,
     },
 
     storeId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Store",
+      ref: 'Store',
       required: true,
     },
 
     employeeId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Employee",
+      ref: 'Employee',
       required: true,
     },
 
@@ -47,13 +47,13 @@ const attendanceSchema = new mongoose.Schema(
 
     source: {
       type: String,
-      enum: ["self", "manual"],
-      default: "self",
+      enum: ['self', 'manual'],
+      default: 'self',
     },
 
     correctedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       default: null,
     },
 
@@ -65,17 +65,14 @@ const attendanceSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["present", "absent", "late", "half_day"],
-      default: "present",
+      enum: ['present', 'absent', 'late', 'half_day'],
+      default: 'present',
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Ek employee ka ek store mein ek din ka attendance record
-attendanceSchema.index(
-  { employeeId: 1, date: 1 },
-  { unique: true }
-);
+attendanceSchema.index({ employeeId: 1, date: 1 }, { unique: true });
 
-export const AttendanceModel = mongoose.model("Attendance", attendanceSchema);
+export const AttendanceModel = mongoose.model('Attendance', attendanceSchema);

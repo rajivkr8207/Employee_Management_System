@@ -4,7 +4,7 @@ import cors from 'cors';
 import morgan from 'morgan';
 import helmet from 'helmet';
 import compression from 'compression';
-import Config from './config/Config.js';
+import Config from './config/config.js';
 import rateLimit from 'express-rate-limit';
 import hpp from 'hpp';
 
