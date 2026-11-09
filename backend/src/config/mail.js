@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import Config from './Config.js';
+import Config from './config.js';
 
 let cachedTransporter = null;
 
