@@ -1,4 +1,4 @@
-*.html
 node_modules/
 logs
 .env
+projectreport.html
