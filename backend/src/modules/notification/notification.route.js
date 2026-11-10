@@ -5,6 +5,7 @@ import {
   getUnreadNotificationCount,
   readNotification,
   readAllNotifications,
+  sendBroadcastNotification,
 } from './notification.controller.js';
 
 const notificationRouter = Router();
@@ -15,5 +16,6 @@ notificationRouter.get('/', getNotifications);
 notificationRouter.get('/unread-count', getUnreadNotificationCount);
 notificationRouter.patch('/read-all', readAllNotifications);
 notificationRouter.patch('/:id/read', readNotification);
+notificationRouter.post('/broadcast', sendBroadcastNotification);
 
 export default notificationRouter;

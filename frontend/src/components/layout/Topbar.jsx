@@ -1,15 +1,32 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Menu, Bell, User, LogOut, Settings, ChevronDown, Shield, CheckCheck, Clock } from "lucide-react";
+import { Menu, Bell, User, LogOut, Settings, ChevronDown, Shield, CheckCheck, Clock, Megaphone } from "lucide-react";
 import ThemeToggle from "../ui/ThemeToggle";
 import Breadcrumbs from "./Breadcrumbs";
 import MobileSidebar from "./MobileSidebar";
 import useAuth from "../../features/auth/hooks/useAuth";
 import { normalizeRole, ROLE_LABELS } from "../../constants/roles";
 import { notificationService } from "../../features/notifications/notificationService";
+import BroadcastNotificationModal from "../../features/notifications/BroadcastNotificationModal";
 
 /* ── Notification Dropdown ── */
-function NotificationDropdown({ notifications, unreadCount, onClose, onMarkAllRead, onNotificationClick }) {
+function NotificationDropdown({
+    notifications,
+    unreadCount,
+    onClose,
+    onMarkAllRead,
+    onNotificationClick,
+    canBroadcast,
+    onOpenBroadcast,
+}) {
+    const typeBadges = {
+        announcement: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+        attendance: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
+        alert: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
+        payroll: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+        leave: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+    };
+
     return (
         <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 z-50 bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-card)] shadow-[var(--shadow-lg)] animate-slide-in-up overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--surface-secondary)]">
@@ -21,15 +38,30 @@ function NotificationDropdown({ notifications, unreadCount, onClose, onMarkAllRe
                         </span>
                     )}
                 </div>
-                {unreadCount > 0 && (
-                    <button
-                        type="button"
-                        onClick={onMarkAllRead}
-                        className="text-xs text-[var(--primary)] hover:underline flex items-center gap-1 font-medium"
-                    >
-                        <CheckCheck size={13} /> Mark all read
-                    </button>
-                )}
+                <div className="flex items-center gap-2">
+                    {canBroadcast && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                onClose();
+                                onOpenBroadcast();
+                            }}
+                            className="text-xs text-[var(--primary)] hover:underline flex items-center gap-1 font-semibold px-2 py-0.5 rounded bg-[var(--primary-soft)] border border-[var(--primary)]/20"
+                            title="Send notification to store or organization"
+                        >
+                            <Megaphone size={12} /> Broadcast
+                        </button>
+                    )}
+                    {unreadCount > 0 && (
+                        <button
+                            type="button"
+                            onClick={onMarkAllRead}
+                            className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center gap-1 font-medium"
+                        >
+                            <CheckCheck size={13} /> Mark read
+                        </button>
+                    )}
+                </div>
             </div>
 
             <div className="max-h-80 overflow-y-auto divide-y divide-[var(--border)]">
@@ -47,9 +79,16 @@ function NotificationDropdown({ notifications, unreadCount, onClose, onMarkAllRe
                             }`}
                         >
                             <div className="flex items-start justify-between gap-2">
-                                <p className={`text-xs ${!n.isRead ? "font-bold text-[var(--text-primary)]" : "font-medium text-[var(--text-secondary)]"}`}>
-                                    {n.title}
-                                </p>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                    <p className={`text-xs ${!n.isRead ? "font-bold text-[var(--text-primary)]" : "font-medium text-[var(--text-secondary)]"}`}>
+                                        {n.title}
+                                    </p>
+                                    {n.type && n.type !== 'info' && (
+                                        <span className={`text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.2 rounded border ${typeBadges[n.type] || "bg-gray-500/10 text-gray-500"}`}>
+                                            {n.type}
+                                        </span>
+                                    )}
+                                </div>
                                 {!n.isRead && (
                                     <span className="w-2 h-2 rounded-full bg-[var(--primary)] shrink-0 mt-1" />
                                 )}
@@ -58,7 +97,7 @@ function NotificationDropdown({ notifications, unreadCount, onClose, onMarkAllRe
                                 {n.message}
                             </p>
                             <p className="text-[10px] text-[var(--text-muted)] mt-1.5 flex items-center gap-1">
-                                <Clock size={10} /> {new Date(n.createdAt).toLocaleDateString()}
+                                <Clock size={10} /> {new Date(n.createdAt).toLocaleDateString()} {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </p>
                         </div>
                     ))
@@ -163,6 +202,7 @@ export default function Topbar() {
     const [mobileOpen, setMobileOpen] = useState(false);
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [notifOpen, setNotifOpen] = useState(false);
+    const [broadcastModalOpen, setBroadcastModalOpen] = useState(false);
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const dropdownRef = useRef(null);
@@ -170,6 +210,7 @@ export default function Topbar() {
 
     const roleKey = normalizeRole(user?.role);
     const roleLabel = ROLE_LABELS[roleKey] || "User";
+    const canBroadcast = user?.role === "storeadmin" || user?.role === "admin";
 
     const fetchNotifications = async () => {
         try {
@@ -286,6 +327,8 @@ export default function Topbar() {
                                 onClose={() => setNotifOpen(false)}
                                 onMarkAllRead={handleMarkAllRead}
                                 onNotificationClick={handleNotificationClick}
+                                canBroadcast={canBroadcast}
+                                onOpenBroadcast={() => setBroadcastModalOpen(true)}
                             />
                         )}
                     </div>
@@ -322,6 +365,12 @@ export default function Topbar() {
                     </div>
                 </div>
             </header>
+
+            <BroadcastNotificationModal
+                isOpen={broadcastModalOpen}
+                onClose={() => setBroadcastModalOpen(false)}
+                onSuccess={fetchNotifications}
+            />
         </>
     );
 }
