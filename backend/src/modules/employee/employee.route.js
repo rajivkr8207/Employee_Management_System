@@ -5,11 +5,15 @@ import {
   getEmployeeById,
   getEmployees,
   getMyEmployeeProfile,
+  modifyEmployee,
+  removeEmployee,
 } from './employee.controller.js';
 import {
   createEmployeeValidation,
   getEmployeeValidation,
   listEmployeesValidation,
+  updateEmployeeValidation,
+  deleteEmployeeValidation,
 } from './employee.validate.js';
 
 const employeeRouter = Router();
@@ -20,6 +24,10 @@ employeeRouter
   .get(listEmployeesValidation, getEmployees)
   .post(createEmployeeValidation, addEmployee);
 employeeRouter.get('/me', getMyEmployeeProfile);
-employeeRouter.get('/:employeeId', getEmployeeValidation, getEmployeeById);
+employeeRouter
+  .route('/:employeeId')
+  .get(getEmployeeValidation, getEmployeeById)
+  .patch(updateEmployeeValidation, modifyEmployee)
+  .delete(deleteEmployeeValidation, removeEmployee);
 
 export default employeeRouter;

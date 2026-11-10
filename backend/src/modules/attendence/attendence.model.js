@@ -74,5 +74,6 @@ const attendanceSchema = new mongoose.Schema(
 
 // Ek employee ka ek store mein ek din ka attendance record
 attendanceSchema.index({ employeeId: 1, date: 1 }, { unique: true });
+attendanceSchema.index({ organizationId: 1, storeId: 1, date: -1 });
 
 export const AttendanceModel = mongoose.model('Attendance', attendanceSchema);

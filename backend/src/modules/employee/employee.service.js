@@ -192,7 +192,7 @@ export const createEmployee = async (employeeData, requesterId) => {
   return populateEmployee(EmployeeModel.findById(createdEmployee._id));
 };
 
-export const listEmployees = async ({ userId, organizationId, storeId }) => {
+export const listEmployees = async ({ userId, organizationId, storeId, page, limit }) => {
   const { allowedStoreIds } = await authorizeOrganizationAccess({
     userId,
     organizationId,
@@ -201,7 +201,13 @@ export const listEmployees = async ({ userId, organizationId, storeId }) => {
   const query = { organizationId };
   if (storeId) query.storeId = storeId;
   else if (allowedStoreIds) query.storeId = { $in: allowedStoreIds };
-  return populateEmployee(EmployeeModel.find(query).sort({ createdAt: -1 }));
+  let q = EmployeeModel.find(query).sort({ createdAt: -1 });
+  if (page && limit) {
+    const p = Math.max(1, Number(page));
+    const l = Math.min(100, Math.max(1, Number(limit)));
+    q = q.skip((p - 1) * l).limit(l);
+  }
+  return populateEmployee(q);
 };
 
 export const getEmployee = async ({ userId, organizationId, employeeId }) => {
@@ -220,5 +226,48 @@ export const getEmployee = async ({ userId, organizationId, employeeId }) => {
 export const getMyEmployee = async (userId) => {
   const employee = await EmployeeModel.findOne({ userId });
   if (!employee) throw new ApiError(404, 'Your employee profile was not found');
+  return populateEmployee(EmployeeModel.findById(employee._id));
+};
+
+export const updateEmployee = async (employeeId, updateData, requesterId) => {
+  const employee = await EmployeeModel.findById(employeeId).select('storeId organizationId userId');
+  if (!employee) throw new ApiError(404, 'Employee was not found');
+
+  await authorizeOrganizationAccess({
+    userId: requesterId,
+    organizationId: employee.organizationId,
+    storeId: employee.storeId,
+  });
+
+  const allowed = ['designation', 'salary', 'Dob', 'joiningDate', 'status'];
+  const updates = Object.fromEntries(
+    Object.entries(updateData).filter(([k]) => allowed.includes(k)),
+  );
+  if (!Object.keys(updates).length) throw new ApiError(400, 'No valid fields provided to update');
+
+  const updated = await EmployeeModel.findByIdAndUpdate(
+    employeeId,
+    { $set: updates },
+    { new: true, runValidators: true },
+  );
+  return populateEmployee(EmployeeModel.findById(updated._id));
+};
+
+export const softDeleteEmployee = async (employeeId, requesterId) => {
+  const employee = await EmployeeModel.findById(employeeId).select(
+    'storeId organizationId userId status',
+  );
+  if (!employee) throw new ApiError(404, 'Employee was not found');
+
+  await authorizeOrganizationAccess({
+    userId: requesterId,
+    organizationId: employee.organizationId,
+    storeId: employee.storeId,
+  });
+
+  if (employee.status === 'terminated') throw new ApiError(409, 'Employee is already terminated');
+
+  employee.status = 'terminated';
+  await employee.save();
   return populateEmployee(EmployeeModel.findById(employee._id));
 };

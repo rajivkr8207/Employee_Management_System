@@ -1,29 +1,31 @@
-# stage 1 frontend build folder
-FROM node:20-alpine AS frontend_builder
 
-WORKDIR /app
+FROM node:22-alpine AS frontend-build
 
-COPY ./frontend/package*.json /app
+WORKDIR /app/frontend
 
-RUN npm install 
+COPY frontend/package*.json ./
 
-COPY ./frontend /app
+RUN npm ci
 
+COPY frontend/ ./
 
 RUN npm run build
 
-# stage 2 fullstack container
-FROM node:20-alpine 
+
+FROM node:22-alpine AS production
 
 WORKDIR /app
 
-COPY ./backend/package*.json /app
+ENV NODE_ENV=production
 
-RUN npm install 
+COPY backend/package*.json ./
 
-COPY ./backend /app
+RUN npm ci --omit=dev
 
+COPY backend/ ./
 
-COPY --from=frontend_builder /app/dist /app/public/dist
+COPY --from=frontend-build /app/frontend/dist ./public/dist
 
-CMD [ "npm","start" ]
+EXPOSE 8000
+
+CMD ["npm", "start"]

@@ -56,4 +56,6 @@ const leaveSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+leaveSchema.index({ organizationId: 1, employeeId: 1, from: -1 });
+
 export const LeaveModel = mongoose.model('Leave', leaveSchema);

@@ -8,7 +8,7 @@ jest.unstable_mockModule('../src/config/redis.js', () => ({
     set: async () => 'OK',
     setex: async () => 'OK',
     del: async () => 1,
-    on: () => { },
+    on: () => {},
     quit: async () => 'OK',
   },
 }));

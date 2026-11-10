@@ -135,6 +135,16 @@ const userSchema = new mongoose.Schema(
       select: false,
       default: 0,
     },
+    passwordResetToken: {
+      type: String,
+      select: false,
+      default: null,
+    },
+    passwordResetExpires: {
+      type: Date,
+      select: false,
+      default: null,
+    },
     lastLoginAt: {
       type: Date,
       default: null,
@@ -149,6 +159,8 @@ const userSchema = new mongoose.Schema(
         delete result.otpExpire;
         delete result.refreshTokenHash;
         delete result.refreshTokenVersion;
+        delete result.passwordResetToken;
+        delete result.passwordResetExpires;
         delete result.faceEmbedding;
         return result;
       },

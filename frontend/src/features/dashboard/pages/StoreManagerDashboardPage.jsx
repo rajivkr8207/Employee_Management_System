@@ -1,7 +1,7 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { Clock3, MapPin, Users } from "lucide-react";
+import { Clock3, MapPin, Users, Store } from "lucide-react";
 import Badge from "../../../components/ui/Badge";
 import Button from "../../../components/ui/Button";
 import Card from "../../../components/ui/Card";
@@ -24,12 +24,23 @@ export default function StoreManagerDashboardPage() {
         loading: employeesLoading,
         error: employeesError,
     } = useSelector((state) => state.employees);
-    const store = stores[0];
-    const organizationId = store?.organizationId?._id || store?.organizationId;
+    const [selectedStoreId, setSelectedStoreId] = useState("");
 
     useEffect(() => {
         dispatch(fetchMyStores());
     }, [dispatch]);
+
+    useEffect(() => {
+        if (stores?.length > 0 && (!selectedStoreId || !stores.some((s) => s._id === selectedStoreId))) {
+            setSelectedStoreId(stores[0]._id);
+        }
+    }, [stores, selectedStoreId]);
+
+    const store = useMemo(
+        () => stores.find((s) => s._id === selectedStoreId) || stores[0],
+        [stores, selectedStoreId]
+    );
+    const organizationId = store?.organizationId?._id || store?.organizationId;
 
     useEffect(() => {
         if (organizationId && store?._id) {
@@ -72,9 +83,30 @@ export default function StoreManagerDashboardPage() {
                                 </p>
                                 <p className="mt-1 text-xs text-indigo-200/80">Store code: {store.code}</p>
                             </div>
-                            <Link to="/store-manager/shifts" className="inline-flex items-center gap-2 self-start rounded-lg bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20">
-                                <Clock3 size={16} /> Schedule shifts
-                            </Link>
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                                {stores.length > 1 && (
+                                    <div className="flex items-center gap-2">
+                                        <label htmlFor="store-select" className="text-xs text-indigo-300">
+                                            Store:
+                                        </label>
+                                        <select
+                                            id="store-select"
+                                            value={store._id}
+                                            onChange={(e) => setSelectedStoreId(e.target.value)}
+                                            className="rounded-lg bg-white/10 border border-white/20 px-3 py-1.5 text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-white/40"
+                                        >
+                                            {stores.map((s) => (
+                                                <option key={s._id} value={s._id} className="text-gray-900">
+                                                    {s.name} ({s.code})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+                                <Link to="/store-manager/shifts" className="inline-flex items-center gap-2 self-start rounded-lg bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20">
+                                    <Clock3 size={16} /> Schedule shifts
+                                </Link>
+                            </div>
                         </div>
                     </>
                 ) : (

@@ -55,6 +55,24 @@ export class MailService {
     return this.SendRegisterMail(email, otp, fullName);
   }
 
+  SendPasswordResetMail(email, resetUrl, fullName) {
+    const text = `Hello ${fullName},\n\nYou requested a password reset. Please use the following link to reset your password:\n${resetUrl}\n\nThis link is valid for 1 hour. If you did not request this, please ignore this email.\n\nThank you,\nEMS Team`;
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px;">
+        <h2 style="color: #4f46e5; margin-bottom: 16px;">Password Reset Request</h2>
+        <p>Hello <strong>${fullName}</strong>,</p>
+        <p>You requested to reset your password. Click the button below to proceed:</p>
+        <div style="margin: 24px 0; text-align: center;">
+          <a href="${resetUrl}" style="display: inline-block; background: #4f46e5; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 15px;">Reset Password</a>
+        </div>
+        <p style="font-size: 13px; color: #64748b;">Or copy and paste this link into your browser:</p>
+        <p style="font-size: 12px; color: #4f46e5; word-break: break-all;">${resetUrl}</p>
+        <p style="color: #64748b; font-size: 13px; margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 12px;">This link will expire in 1 hour. If you didn't request a password reset, you can safely ignore this email.</p>
+      </div>
+    `;
+    return this.sendMail({ to: email, subject: 'Password Reset Request', text, html });
+  }
+
   SendStoreAdminInvitation(email, invitationLink, storeDetails = {}) {
     const storeName = storeDetails.storeName || 'New Store';
     const storeCode = storeDetails.storeCode ? ` (Code: ${storeDetails.storeCode})` : '';

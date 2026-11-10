@@ -16,6 +16,8 @@ import {
   listPendingStoreAdmins,
   approveStoreAdmin,
   rejectStoreAdmin,
+  requestPasswordReset,
+  resetPasswordWithToken,
 } from './user.service.js';
 import { enrollUserFace } from './face.service.js';
 
@@ -198,4 +200,15 @@ export const changePassword = asyncHandler(async (req, res) => {
   const result = await changeUserPassword(req.user.id, { oldPassword, newPassword });
 
   return res.status(200).json(new ApiResponse(200, result, 'Password changed successfully'));
+});
+
+export const forgotPassword = asyncHandler(async (req, res) => {
+  const result = await requestPasswordReset(req.body.email);
+  return res.status(200).json(new ApiResponse(200, result, result.message));
+});
+
+export const resetPassword = asyncHandler(async (req, res) => {
+  const { token, password } = req.body;
+  const result = await resetPasswordWithToken(token, password);
+  return res.status(200).json(new ApiResponse(200, result, result.message));
 });

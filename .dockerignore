@@ -1,2 +1,30 @@
-.env 
-node_modules
+
+# Git
+.git
+.gitignore
+
+# Environment files
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Frontend
+frontend/node_modules
+frontend/dist
+
+# Backend
+backend/node_modules
+backend/public/dist
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile*
+docker-compose*

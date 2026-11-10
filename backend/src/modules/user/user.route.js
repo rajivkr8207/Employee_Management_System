@@ -16,6 +16,8 @@ import {
   approveStoreAdminAccount,
   rejectStoreAdminAccount,
   enrollFace,
+  forgotPassword,
+  resetPassword,
 } from './user.controller.js';
 import { verifyAdmin, verifyJWT } from '../../middlewares/auth.middleware.js';
 import { receiveImage } from '../../middlewares/imageUpload.middleware.js';
@@ -31,6 +33,8 @@ import {
   invitedStoreAdminRegisterValidation,
   verifyStoreAdminInvitationValidation,
   storeAdminRejectionValidation,
+  forgotPasswordValidation,
+  resetPasswordValidation,
 } from './user.validate.js';
 
 const authRouter = Router();
@@ -71,6 +75,9 @@ authRouter.post(
  * @access  Public
  */
 authRouter.post('/login', loginValidation, login);
+
+authRouter.post('/forgot-password', forgotPasswordValidation, forgotPassword);
+authRouter.post('/reset-password', resetPasswordValidation, resetPassword);
 
 /**
  * @route   POST /api/v1/auth/refresh-token

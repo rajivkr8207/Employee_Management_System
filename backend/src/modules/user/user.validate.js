@@ -188,3 +188,31 @@ export const changePasswordValidation = [
     .withMessage('New password and confirmation do not match'),
   validate,
 ];
+
+export const forgotPasswordValidation = [
+  body('email')
+    .trim()
+    .notEmpty()
+    .withMessage('Email is required')
+    .isEmail()
+    .withMessage('Please provide a valid email')
+    .toLowerCase(),
+  validate,
+];
+
+export const resetPasswordValidation = [
+  body('token').trim().notEmpty().withMessage('Reset token is required'),
+  body('password')
+    .notEmpty()
+    .withMessage('New password is required')
+    .isLength({ min: 6 })
+    .withMessage('Password must be at least 6 characters')
+    .matches(/\d/)
+    .withMessage('Password must contain at least one number'),
+  body('confirmPassword')
+    .notEmpty()
+    .withMessage('Password confirmation is required')
+    .custom((value, { req }) => value === req.body.password)
+    .withMessage('Passwords do not match'),
+  validate,
+];

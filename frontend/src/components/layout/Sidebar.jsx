@@ -62,6 +62,8 @@ function getNavSections(role, pendingUsersCount, pendingStoresCount, pendingMana
                     { label: "All Users", icon: Users, to: "/admin/users" },
                     { label: "All Stores", icon: Building2, to: "/admin/stores" },
                     { label: "All Employees", icon: Briefcase, to: "/admin/employees" },
+                    { label: "Departments", icon: Building2, to: "/admin/departments" },
+                    { label: "Payroll", icon: DollarSign, to: "/admin/payroll" },
                 ],
             },
             {
@@ -85,6 +87,8 @@ function getNavSections(role, pendingUsersCount, pendingStoresCount, pendingMana
                     { label: "Assigned Stores", icon: Store, to: "/store-admin/stores" },
                     { label: "Store Managers", icon: ShieldCheck, to: "/store-admin/managers" },
                     { label: "Employees", icon: Users, to: "/store-admin/employees" },
+                    { label: "Departments", icon: Building2, to: "/store-admin/departments" },
+                    { label: "Payroll", icon: DollarSign, to: "/store-admin/payroll" },
                     { label: "Shift Schedule", icon: Clock, to: "/store-admin/shifts" },
                 ],
             },
@@ -106,6 +110,7 @@ function getNavSections(role, pendingUsersCount, pendingStoresCount, pendingMana
                 items: [
                     { label: "Store Dashboard", icon: LayoutDashboard, to: "/store-manager/dashboard" },
                     { label: "Store Employees", icon: Users, to: "/store-manager/employees" },
+                    { label: "Payroll", icon: DollarSign, to: "/store-manager/payroll" },
                     { label: "Attendance", icon: CalendarCheck, to: "/store-manager/attendance" },
                     { label: "Leave Requests", icon: CalendarOff, to: "/store-manager/leaves" },
                     { label: "Shift Schedule", icon: Clock, to: "/store-manager/shifts" },

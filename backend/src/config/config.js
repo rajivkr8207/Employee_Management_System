@@ -14,7 +14,7 @@ const Config = {
 
   // Redis (optional)
   redis_host: process.env.REDIS_HOST,
-  redis_port: process.env.REDIS_PORT ? Number(process.env.redis_port) : undefined,
+  redis_port: process.env.REDIS_PORT ? Number(process.env.REDIS_PORT) : undefined,
   redis_password: process.env.REDIS_PASSWORD,
 
   // SMTP (optional)

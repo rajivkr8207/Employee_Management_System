@@ -9,6 +9,9 @@ import shiftRouter from './modules/shift/shift.route.js';
 import attendanceRouter from './modules/attendence/attendence.route.js';
 import leaveRouter from './modules/leave/leave.route.js';
 import adminRouter from './modules/admin/admin.route.js';
+import departmentRouter from './modules/department/department.route.js';
+import payrollRouter from './modules/payroll/payroll.route.js';
+import notificationRouter from './modules/notification/notification.route.js';
 import { auditActivity } from './modules/activityLog/activityLog.middleware.js';
 
 const AllRoutes = express.Router();
@@ -24,5 +27,8 @@ AllRoutes.use('/attendance', attendanceRouter);
 AllRoutes.use('/leaves', leaveRouter);
 AllRoutes.use('/auth', authRouter);
 AllRoutes.use('/admin', adminRouter);
+AllRoutes.use('/departments', departmentRouter);
+AllRoutes.use('/payroll', payrollRouter);
+AllRoutes.use('/notifications', notificationRouter);
 
 export { AllRoutes };

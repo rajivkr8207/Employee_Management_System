@@ -7,6 +7,8 @@ import AppLayout from "../components/layout/AppLayout";
 // Auth pages & guards
 import Login from "../features/auth/pages/Login";
 import Register from "../features/auth/pages/Register";
+import ForgotPassword from "../features/auth/pages/ForgotPassword";
+import ResetPassword from "../features/auth/pages/ResetPassword";
 import Profile from "../features/auth/pages/Profile";
 import AccountStatusPage from "../features/auth/pages/AccountStatusPage";
 import ProtectedRoute from "../features/auth/components/ProtectedRoute";
@@ -31,6 +33,8 @@ import ShiftSchedulePage from "../features/shift/pages/ShiftSchedulePage";
 // Dedicated Feature Pages
 import StoreListPage from "../features/store/pages/StoreListPage";
 import EmployeeListPage from "../features/employees/pages/EmployeeListPage";
+import DepartmentsPage from "../features/departments/pages/DepartmentsPage";
+import PayrollPage from "../features/payroll/pages/PayrollPage";
 import InviteStoreAdminPage from "../features/admin/pages/InviteStoreAdminPage";
 import OrganizationProfilePage from "../features/organization/pages/OrganizationProfilePage";
 import OrganizationVerificationPage from "../features/organization/pages/OrganizationVerificationPage";
@@ -66,6 +70,8 @@ export default function AppRoutes() {
       <Route element={<PublicRoute />}>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
       </Route>
 
       {/* ── Account Status Route (Pending / Rejected / Suspended) ── */}
@@ -97,6 +103,8 @@ export default function AppRoutes() {
             <Route path="/admin/users" element={<AllUsersPage />} />
             <Route path="/admin/stores" element={<AllStoresPage />} />
             <Route path="/admin/employees" element={<AllEmployeesPage />} />
+            <Route path="/admin/departments" element={<DepartmentsPage />} />
+            <Route path="/admin/payroll" element={<PayrollPage />} />
             <Route path="/admin/analytics" element={<ReportsAnalyticsPage />} />
             <Route path="/admin/activity-logs" element={<ActivityLogsPage />} />
           </Route>
@@ -111,6 +119,8 @@ export default function AppRoutes() {
               element={<StoreAdminOperationsPage activeSection="managers" />}
             />
             <Route path="/store-admin/employees" element={<EmployeeListPage />} />
+            <Route path="/store-admin/departments" element={<DepartmentsPage />} />
+            <Route path="/store-admin/payroll" element={<PayrollPage />} />
             <Route path="/store-admin/shifts" element={<ShiftSchedulePage />} />
             <Route
               path="/store-admin/attendance"
@@ -130,6 +140,7 @@ export default function AppRoutes() {
           >
             <Route path="/store-manager/dashboard" element={<StoreManagerDashboardPage />} />
             <Route path="/store-manager/employees" element={<EmployeeListPage />} />
+            <Route path="/store-manager/payroll" element={<PayrollPage />} />
             <Route
               path="/store-manager/attendance"
               element={<StoreManagerOperationsPage activeSection="attendance" />}

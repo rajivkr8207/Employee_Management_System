@@ -72,19 +72,19 @@ export default function Login() {
                         leaves and more — all in one place.
                     </p>
 
-                    {/* Stats */}
-                    <div className="mt-10 grid grid-cols-3 gap-4">
+                    {/* Feature highlights */}
+                    <div className="mt-10 grid grid-cols-3 gap-3">
                         {[
-                            { label: "Employees", val: "1,200+" },
-                            { label: "Departments", val: "24" },
-                            { label: "Uptime", val: "99.9%" },
+                            { label: "Security", val: "Role-Based" },
+                            { label: "Attendance", val: "Face / Geo" },
+                            { label: "Operations", val: "Multi-Store" },
                         ].map((s) => (
                             <div
                                 key={s.label}
-                                className="bg-white/[0.08] rounded-xl px-3 py-4 border border-white/10"
+                                className="bg-white/[0.08] rounded-xl px-2.5 py-3 border border-white/10 text-center"
                             >
-                                <p className="text-xl font-bold text-white">{s.val}</p>
-                                <p className="text-xs text-indigo-300 mt-0.5">{s.label}</p>
+                                <p className="text-sm font-semibold text-white">{s.val}</p>
+                                <p className="text-[11px] text-indigo-300 mt-0.5">{s.label}</p>
                             </div>
                         ))}
                     </div>

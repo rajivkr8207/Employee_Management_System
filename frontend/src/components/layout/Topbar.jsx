@@ -1,11 +1,72 @@
 import { useState, useRef, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { Menu, Bell, User, LogOut, Settings, ChevronDown, Shield } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Menu, Bell, User, LogOut, Settings, ChevronDown, Shield, CheckCheck, Clock } from "lucide-react";
 import ThemeToggle from "../ui/ThemeToggle";
 import Breadcrumbs from "./Breadcrumbs";
 import MobileSidebar from "./MobileSidebar";
 import useAuth from "../../features/auth/hooks/useAuth";
 import { normalizeRole, ROLE_LABELS } from "../../constants/roles";
+import { notificationService } from "../../features/notifications/notificationService";
+
+/* ── Notification Dropdown ── */
+function NotificationDropdown({ notifications, unreadCount, onClose, onMarkAllRead, onNotificationClick }) {
+    return (
+        <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 z-50 bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-card)] shadow-[var(--shadow-lg)] animate-slide-in-up overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--surface-secondary)]">
+                <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-[var(--text-primary)]">Notifications</span>
+                    {unreadCount > 0 && (
+                        <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-[var(--primary)] text-white">
+                            {unreadCount}
+                        </span>
+                    )}
+                </div>
+                {unreadCount > 0 && (
+                    <button
+                        type="button"
+                        onClick={onMarkAllRead}
+                        className="text-xs text-[var(--primary)] hover:underline flex items-center gap-1 font-medium"
+                    >
+                        <CheckCheck size={13} /> Mark all read
+                    </button>
+                )}
+            </div>
+
+            <div className="max-h-80 overflow-y-auto divide-y divide-[var(--border)]">
+                {notifications.length === 0 ? (
+                    <div className="py-8 text-center text-sm text-[var(--text-muted)]">
+                        No notifications yet
+                    </div>
+                ) : (
+                    notifications.map((n) => (
+                        <div
+                            key={n._id}
+                            onClick={() => onNotificationClick(n)}
+                            className={`p-3.5 hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer ${
+                                !n.isRead ? "bg-[var(--primary-soft)]/20" : ""
+                            }`}
+                        >
+                            <div className="flex items-start justify-between gap-2">
+                                <p className={`text-xs ${!n.isRead ? "font-bold text-[var(--text-primary)]" : "font-medium text-[var(--text-secondary)]"}`}>
+                                    {n.title}
+                                </p>
+                                {!n.isRead && (
+                                    <span className="w-2 h-2 rounded-full bg-[var(--primary)] shrink-0 mt-1" />
+                                )}
+                            </div>
+                            <p className="text-xs text-[var(--text-muted)] mt-1 line-clamp-2 leading-relaxed">
+                                {n.message}
+                            </p>
+                            <p className="text-[10px] text-[var(--text-muted)] mt-1.5 flex items-center gap-1">
+                                <Clock size={10} /> {new Date(n.createdAt).toLocaleDateString()}
+                            </p>
+                        </div>
+                    ))
+                )}
+            </div>
+        </div>
+    );
+}
 
 /* ── User Avatar ── */
 function UserAvatar({ user }) {
@@ -98,24 +159,76 @@ function ProfileDropdown({ user, onClose, logout }) {
 
 export default function Topbar() {
     const { user, logout } = useAuth();
+    const navigate = useNavigate();
     const [mobileOpen, setMobileOpen] = useState(false);
     const [dropdownOpen, setDropdownOpen] = useState(false);
+    const [notifOpen, setNotifOpen] = useState(false);
+    const [notifications, setNotifications] = useState([]);
+    const [unreadCount, setUnreadCount] = useState(0);
     const dropdownRef = useRef(null);
+    const notifRef = useRef(null);
 
     const roleKey = normalizeRole(user?.role);
     const roleLabel = ROLE_LABELS[roleKey] || "User";
 
-    /* Close dropdown on outside click */
+    const fetchNotifications = async () => {
+        try {
+            const [nRes, uRes] = await Promise.all([
+                notificationService.getNotifications({ limit: 15 }),
+                notificationService.getUnreadCount(),
+            ]);
+            setNotifications(nRes.data?.data?.notifications || []);
+            setUnreadCount(uRes.data?.data?.unreadCount || 0);
+        } catch {
+            // Silently handle if notifications are not ready
+        }
+    };
+
     useEffect(() => {
-        if (!dropdownOpen) return;
+        if (user?._id || user?.id) {
+            fetchNotifications();
+            const interval = setInterval(fetchNotifications, 60000);
+            return () => clearInterval(interval);
+        }
+    }, [user?._id, user?.id]);
+
+    /* Close dropdowns on outside click */
+    useEffect(() => {
         const handler = (e) => {
             if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
                 setDropdownOpen(false);
             }
+            if (notifRef.current && !notifRef.current.contains(e.target)) {
+                setNotifOpen(false);
+            }
         };
         document.addEventListener("mousedown", handler);
         return () => document.removeEventListener("mousedown", handler);
-    }, [dropdownOpen]);
+    }, []);
+
+    const handleMarkAllRead = async () => {
+        try {
+            await notificationService.markAllAsRead();
+            setUnreadCount(0);
+            setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+        } catch {}
+    };
+
+    const handleNotificationClick = async (notification) => {
+        if (!notification.isRead) {
+            try {
+                await notificationService.markAsRead(notification._id);
+                setUnreadCount((c) => Math.max(0, c - 1));
+                setNotifications((prev) =>
+                    prev.map((n) => (n._id === notification._id ? { ...n, isRead: true } : n))
+                );
+            } catch {}
+        }
+        if (notification.actionUrl) {
+            setNotifOpen(false);
+            navigate(notification.actionUrl);
+        }
+    };
 
     const firstName = (user?.fullName || user?.name || "User").split(" ")[0];
 
@@ -154,14 +267,28 @@ export default function Topbar() {
                     </span>
 
                     {/* Notifications */}
-                    <button
-                        type="button"
-                        className="relative flex items-center justify-center w-9 h-9 rounded-[var(--radius-control)] text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] border border-[var(--border)] bg-[var(--surface)] transition-colors duration-150 shadow-[var(--shadow-xs)]"
-                        aria-label="Notifications"
-                    >
-                        <Bell size={16} />
-                        <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[var(--danger)] ring-2 ring-[var(--surface)]" />
-                    </button>
+                    <div className="relative" ref={notifRef}>
+                        <button
+                            type="button"
+                            onClick={() => setNotifOpen((o) => !o)}
+                            className="relative flex items-center justify-center w-9 h-9 rounded-[var(--radius-control)] text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] border border-[var(--border)] bg-[var(--surface)] transition-colors duration-150 shadow-[var(--shadow-xs)]"
+                            aria-label="Notifications"
+                        >
+                            <Bell size={16} />
+                            {unreadCount > 0 && (
+                                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[var(--danger)] ring-2 ring-[var(--surface)]" />
+                            )}
+                        </button>
+                        {notifOpen && (
+                            <NotificationDropdown
+                                notifications={notifications}
+                                unreadCount={unreadCount}
+                                onClose={() => setNotifOpen(false)}
+                                onMarkAllRead={handleMarkAllRead}
+                                onNotificationClick={handleNotificationClick}
+                            />
+                        )}
+                    </div>
 
                     {/* Theme toggle */}
                     <ThemeToggle />
