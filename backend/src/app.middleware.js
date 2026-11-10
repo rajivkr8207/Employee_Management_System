@@ -37,13 +37,7 @@ export const Middleware = (app) => {
   app.use(express.urlencoded({ extended: true, limit: '16kb' }));
   app.use(cookieParser());
   app.use(cors(corsOption));
-  app.use(
-    morgan('dev', {
-      skip: (req, res) => {
-        return req.url.startsWith('/api/v1/payments/webhook');
-      },
-    }),
-  );
+  app.use(morgan('dev'));
   app.use(helmet());
   app.use(compression());
   app.use(express.static('public/dist'));

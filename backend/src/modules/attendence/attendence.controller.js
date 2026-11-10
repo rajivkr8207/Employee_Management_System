@@ -1,6 +1,10 @@
 import { ApiResponse } from '../../utils/ApiResponse.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import {
+  createNotification,
+  notifyStoreAdminsOnAttendance,
+} from '../notification/notification.service.js';
+import {
   checkIn,
   checkOut,
   correctAttendance,
@@ -12,27 +16,93 @@ import {
 } from './attendence.service.js';
 
 export const checkInEmployee = asyncHandler(async (req, res) => {
-  const attendance = await checkIn({
-    userId: req.user.id,
-    organizationId: req.body.organizationId,
-    location: getRequestLocation(req.body),
-    imageBuffer: req.file?.buffer,
-  });
-  return res
-    .status(201)
-    .json(new ApiResponse(201, { attendance }, 'Check-in recorded successfully'));
+  try {
+    const attendance = await checkIn({
+      userId: req.user.id,
+      organizationId: req.body.organizationId,
+      location: getRequestLocation(req.body),
+      imageBuffer: req.file?.buffer,
+    });
+
+    const storeName = attendance?.storeId?.name || 'store';
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    createNotification({
+      userId: req.user.id,
+      title: 'Check-in Successful',
+      message: `Checked in successfully at ${timeStr} (${storeName}).`,
+      type: 'attendance',
+      actionUrl: '/employee/dashboard',
+    }).catch(() => {});
+
+    notifyStoreAdminsOnAttendance({
+      organizationId: req.body.organizationId,
+      storeId: attendance?.storeId?._id || attendance?.storeId,
+      employeeName: req.user.fullName || 'Employee',
+      type: 'checkIn',
+      timeStr,
+      storeName,
+    }).catch(() => {});
+
+    return res
+      .status(201)
+      .json(new ApiResponse(201, { attendance }, 'Check-in recorded successfully'));
+  } catch (error) {
+    createNotification({
+      userId: req.user.id,
+      title: 'Check-in Failed',
+      message: `Check-in failed: ${error.message || 'Verification failed'}`,
+      type: 'alert',
+      actionUrl: '/employee/dashboard',
+    }).catch(() => {});
+
+    throw error;
+  }
 });
 
 export const checkOutEmployee = asyncHandler(async (req, res) => {
-  const attendance = await checkOut({
-    userId: req.user.id,
-    organizationId: req.body.organizationId,
-    location: getRequestLocation(req.body),
-    imageBuffer: req.file?.buffer,
-  });
-  return res
-    .status(200)
-    .json(new ApiResponse(200, { attendance }, 'Check-out recorded successfully'));
+  try {
+    const attendance = await checkOut({
+      userId: req.user.id,
+      organizationId: req.body.organizationId,
+      location: getRequestLocation(req.body),
+      imageBuffer: req.file?.buffer,
+    });
+
+    const storeName = attendance?.storeId?.name || 'store';
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    createNotification({
+      userId: req.user.id,
+      title: 'Check-out Successful',
+      message: `Checked out successfully at ${timeStr} (${storeName}).`,
+      type: 'attendance',
+      actionUrl: '/employee/dashboard',
+    }).catch(() => {});
+
+    notifyStoreAdminsOnAttendance({
+      organizationId: req.body.organizationId,
+      storeId: attendance?.storeId?._id || attendance?.storeId,
+      employeeName: req.user.fullName || 'Employee',
+      type: 'checkOut',
+      timeStr,
+      storeName,
+    }).catch(() => {});
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, { attendance }, 'Check-out recorded successfully'));
+  } catch (error) {
+    createNotification({
+      userId: req.user.id,
+      title: 'Check-out Failed',
+      message: `Check-out failed: ${error.message || 'Verification failed'}`,
+      type: 'alert',
+      actionUrl: '/employee/dashboard',
+    }).catch(() => {});
+
+    throw error;
+  }
 });
 
 const getRequestLocation = (body) =>

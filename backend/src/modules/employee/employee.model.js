@@ -58,6 +58,7 @@ const employeeSchema = new mongoose.Schema(
 );
 
 employeeSchema.index({ organizationId: 1, employeeCode: 1 }, { unique: true });
+employeeSchema.index({ organizationId: 1, storeId: 1, status: 1 });
 employeeSchema.index({ organizationId: 1, userId: 1 }, { unique: true });
 
 export const EmployeeModel = mongoose.model('Employee', employeeSchema);

@@ -14,6 +14,7 @@ import {
     cancelLeave,
     fetchMyLeaves,
 } from "../../leave/leave.thunk";
+import { payrollService } from "../../payroll/services/payrollService";
 
 const getId = (value) => (typeof value === "string" ? value : value?._id);
 const toDateInput = (date) => {
@@ -49,6 +50,8 @@ function EmployeeOperationsContent({ activeSection = "attendance" }) {
     const [tab, setTab] = useState(activeSection);
     const [showLeaveForm, setShowLeaveForm] = useState(false);
     const [form, setForm] = useState({ from: "", to: "", reason: "" });
+    const [myPayrolls, setMyPayrolls] = useState([]);
+    const [payrollsLoading, setPayrollsLoading] = useState(false);
     const organizationId = getId(myEmployee?.organizationId);
 
     useEffect(() => {
@@ -64,6 +67,13 @@ function EmployeeOperationsContent({ activeSection = "attendance" }) {
             dispatch(fetchMyAttendanceRecords({ organizationId, fromDate, toDate }));
         }
         if (tab === "leaves") dispatch(fetchMyLeaves({ organizationId }));
+        if (tab === "salary") {
+            setPayrollsLoading(true);
+            payrollService.getMySalary()
+                .then((res) => setMyPayrolls(res.data?.data?.payrolls || []))
+                .catch(() => {})
+                .finally(() => setPayrollsLoading(false));
+        }
     }, [dispatch, organizationId, tab]);
 
     const salary = myEmployee?.salary == null
@@ -243,13 +253,50 @@ function EmployeeOperationsContent({ activeSection = "attendance" }) {
 
             {tab === "salary" && (
                 <Card padding="md">
-                    <Card.Header withBorder><Card.Title>Compensation</Card.Title></Card.Header>
-                    <Card.Body>
-                        <p className="font-semibold text-[var(--text-primary)]">Configured salary</p>
-                        <p className="mt-1 text-2xl font-bold text-[var(--primary)]">{salary || "Not provided"}</p>
-                        <p className="mt-3 text-sm text-[var(--text-secondary)]">
-                            Payslip history and downloads are not available because the backend does not currently provide a payroll or payslip API.
-                        </p>
+                    <Card.Header withBorder>
+                        <div>
+                            <Card.Title>Compensation & Payslips</Card.Title>
+                            <p className="mt-1 text-xs text-[var(--text-muted)]">Monthly salary breakdown and disbursed payslips</p>
+                        </div>
+                    </Card.Header>
+                    <Card.Body className="space-y-6">
+                        <div className="p-4 rounded-xl bg-[var(--surface-secondary)] border border-[var(--border)]">
+                            <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase">Base Monthly Salary</p>
+                            <p className="mt-1 text-2xl font-bold text-[var(--primary)]">{salary || "Not provided"}</p>
+                        </div>
+
+                        <div>
+                            <h3 className="text-sm font-bold text-[var(--text-primary)] mb-3">Payslip History</h3>
+                            {payrollsLoading ? (
+                                <p className="py-6 text-center text-sm text-[var(--text-secondary)]">Loading payslips...</p>
+                            ) : myPayrolls.length === 0 ? (
+                                <p className="py-6 text-center text-sm text-[var(--text-secondary)]">No payslips generated yet.</p>
+                            ) : (
+                                <div className="divide-y divide-[var(--border)] border border-[var(--border)] rounded-xl overflow-hidden">
+                                    {myPayrolls.map((p) => (
+                                        <div key={p._id} className="p-3.5 flex flex-wrap items-center justify-between gap-3 text-sm hover:bg-[var(--surface-secondary)] transition-colors">
+                                            <div>
+                                                <p className="font-semibold text-[var(--text-primary)]">
+                                                    Period: {p.payPeriodMonth}/{p.payPeriodYear}
+                                                </p>
+                                                <p className="text-xs text-[var(--text-muted)]">
+                                                    {p.presentDays} / {p.totalDays} days attended · Deductions: ₹{Number(p.deductions || 0).toLocaleString("en-IN")}
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center gap-4">
+                                                <div className="text-right">
+                                                    <p className="text-xs text-[var(--text-muted)]">Net Payout</p>
+                                                    <p className="font-bold text-emerald-600">₹{Number(p.netSalary || 0).toLocaleString("en-IN")}</p>
+                                                </div>
+                                                <Badge variant={p.status === "paid" ? "success" : p.status === "approved" ? "primary" : "warning"} dot>
+                                                    {p.status}
+                                                </Badge>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </Card.Body>
                 </Card>
             )}

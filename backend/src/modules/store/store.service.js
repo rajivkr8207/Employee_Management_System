@@ -128,8 +128,24 @@ export const updateStore = async (storeId, storeData, storeAdminId) => {
 };
 
 export const deleteStore = async (storeId, storeAdminId) => {
-  const store = await StoreModel.findOneAndDelete(getOwnedStoreQuery(storeId, storeAdminId));
+  const store = await StoreModel.findOne(getOwnedStoreQuery(storeId, storeAdminId));
   if (!store) throw new ApiError(404, 'Store was not found');
+
+  const activeEmployeesCount = await EmployeeModel.countDocuments({
+    storeId,
+    status: 'active',
+  });
+  if (activeEmployeesCount > 0) {
+    throw new ApiError(
+      409,
+      `Cannot delete store with ${activeEmployeesCount} active employee(s). Please reassign or deactivate employees first.`,
+    );
+  }
+
+  // Deactivate any remaining memberships for this store
+  await MembershipModel.updateMany({ storeIds: storeId }, { $pull: { storeIds: storeId } });
+
+  await StoreModel.deleteOne({ _id: storeId });
 };
 
 export const createStoreManager = async (storeId, managerData, storeAdminId) => {
@@ -173,48 +189,63 @@ export const createStoreManager = async (storeId, managerData, storeAdminId) => 
     throw new ApiError(409, 'User with this email, username, or mobile already exists');
   }
 
-  // 2. Create User account with role MANAGER
-  const managerUser = await User.create({
-    fullName,
-    username: normalizedUsername,
-    email: normalizedEmail,
-    password,
-    ...(mobile ? { mobile } : {}),
-    role: ROLES.MANAGER,
-    provider: 'local',
-    isVerified: true,
-    isApproved: true,
-    isActive: true,
-  });
+  let managerUser = null;
+  let createdMembership = null;
+  let createdEmployee = null;
 
-  // 3. Assign manager to Store
-  store.managerId = managerUser._id;
-  await store.save();
+  try {
+    // 2. Create User account with role MANAGER
+    managerUser = await User.create({
+      fullName,
+      username: normalizedUsername,
+      email: normalizedEmail,
+      password,
+      ...(mobile ? { mobile } : {}),
+      role: ROLES.MANAGER,
+      provider: 'local',
+      isVerified: true,
+      isApproved: true,
+      isActive: true,
+    });
 
-  // 4. Create membership in store & organization
-  await MembershipModel.findOneAndUpdate(
-    { userId: managerUser._id, organizationId: store.organizationId },
-    {
-      $set: {
-        storeIds: [store._id],
-        role: 'manager',
-        status: 'active',
+    // 3. Assign manager to Store
+    store.managerId = managerUser._id;
+    await store.save();
+
+    // 4. Create membership in store & organization
+    createdMembership = await MembershipModel.findOneAndUpdate(
+      { userId: managerUser._id, organizationId: store.organizationId },
+      {
+        $set: {
+          storeIds: [store._id],
+          role: 'manager',
+          status: 'active',
+        },
       },
-    },
-    { upsert: true, new: true },
-  );
+      { upsert: true, new: true },
+    );
 
-  // 5. Create employee record for manager
-  const employeeCode = 'MGR-' + crypto.randomBytes(3).toString('hex').toUpperCase();
-  await EmployeeModel.create({
-    organizationId: store.organizationId,
-    storeId: store._id,
-    userId: managerUser._id,
-    employeeCode,
-    designation,
-    salary,
-    status: 'active',
-  });
+    // 5. Create employee record for manager
+    const employeeCode = 'MGR-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+    createdEmployee = await EmployeeModel.create({
+      organizationId: store.organizationId,
+      storeId: store._id,
+      userId: managerUser._id,
+      employeeCode,
+      designation,
+      salary,
+      status: 'active',
+    });
+  } catch (error) {
+    if (createdEmployee) await EmployeeModel.deleteOne({ _id: createdEmployee._id });
+    if (createdMembership) await MembershipModel.deleteOne({ _id: createdMembership._id });
+    if (store.managerId?.toString() === managerUser?._id?.toString()) {
+      store.managerId = null;
+      await store.save();
+    }
+    if (managerUser) await User.deleteOne({ _id: managerUser._id });
+    throw error;
+  }
 
   // 6. Send credentials email
   try {

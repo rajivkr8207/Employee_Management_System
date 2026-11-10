@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { Building2, Clock3, Mail, MapPin, Store, Users, UserRound } from "lucide-react";
+import { Building2, Clock3, Mail, MapPin, Store, Users, UserRound, Megaphone } from "lucide-react";
 import Card from "../../../components/ui/Card";
 import Badge from "../../../components/ui/Badge";
 import Button from "../../../components/ui/Button";
 import { fetchEmployees } from "../../employees/employees.thunk";
 import { fetchMyStores } from "../../store/store.thunk";
+import BroadcastNotificationModal from "../../notifications/BroadcastNotificationModal";
 
 const formatDate = (value) => {
     if (!value) return "Not provided";
@@ -35,6 +36,7 @@ export default function StoreAdminDashboardPage() {
         error: employeesError,
     } = useSelector((state) => state.employees);
     const [selectedStore, setSelectedStore] = useState("all");
+    const [broadcastOpen, setBroadcastOpen] = useState(false);
 
     const organizationId = stores[0]?.organizationId?._id || stores[0]?.organizationId;
 
@@ -109,6 +111,13 @@ export default function StoreAdminDashboardPage() {
                     >
                         <Users size={14} /> Manage Employees
                     </Link>
+                    <button
+                        type="button"
+                        onClick={() => setBroadcastOpen(true)}
+                        className="inline-flex items-center gap-2 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-sm"
+                    >
+                        <Megaphone size={14} /> Broadcast Announcement
+                    </button>
                     <Link
                         to="/store-admin/shifts"
                         className="inline-flex items-center gap-2 px-3.5 py-2 bg-[var(--surface)] border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] rounded-lg text-xs font-semibold transition-colors shadow-sm"
@@ -275,6 +284,11 @@ export default function StoreAdminDashboardPage() {
                     ))}
                 </section>
             )}
+
+            <BroadcastNotificationModal
+                isOpen={broadcastOpen}
+                onClose={() => setBroadcastOpen(false)}
+            />
         </div>
     );
 }

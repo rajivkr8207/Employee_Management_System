@@ -123,3 +123,39 @@ export const getEmployeeValidation = [
   organizationQueryValidation,
   validate,
 ];
+
+export const updateEmployeeValidation = [
+  param('employeeId').isMongoId().withMessage('A valid employee ID is required'),
+  body('designation')
+    .optional()
+    .trim()
+    .notEmpty()
+    .withMessage('Designation cannot be empty')
+    .isLength({ max: 100 })
+    .withMessage('Designation cannot exceed 100 characters'),
+  body('salary')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Salary must be zero or greater')
+    .toFloat(),
+  body('Dob')
+    .optional({ values: 'falsy' })
+    .isISO8601()
+    .withMessage('Date of birth must be a valid date')
+    .toDate(),
+  body('joiningDate')
+    .optional()
+    .isISO8601()
+    .withMessage('Joining date must be a valid date')
+    .toDate(),
+  body('status')
+    .optional()
+    .isIn(['active', 'inactive', 'terminated'])
+    .withMessage('Employee status must be active, inactive, or terminated'),
+  validate,
+];
+
+export const deleteEmployeeValidation = [
+  param('employeeId').isMongoId().withMessage('A valid employee ID is required'),
+  validate,
+];

@@ -39,14 +39,25 @@ function StoreManagerOperationsContent({ activeSection = "employees" }) {
     const { leaves, loading: leavesLoading, saving, error: leavesError } = useSelector((state) => state.leave);
     const { assignments, loading: shiftsLoading, error: shiftsError } = useSelector((state) => state.shiftSchedule);
     const [tab, setTab] = useState(activeSection);
-    const store = stores[0];
-    const storeId = store?._id;
-    const organizationId = getId(store?.organizationId);
-    const today = dayKey(new Date());
+    const [selectedStoreId, setSelectedStoreId] = useState("");
 
     useEffect(() => {
         dispatch(fetchMyStores());
     }, [dispatch]);
+
+    useEffect(() => {
+        if (stores?.length > 0 && (!selectedStoreId || !stores.some((s) => s._id === selectedStoreId))) {
+            setSelectedStoreId(stores[0]._id);
+        }
+    }, [stores, selectedStoreId]);
+
+    const store = useMemo(
+        () => stores.find((s) => s._id === selectedStoreId) || stores[0],
+        [stores, selectedStoreId]
+    );
+    const storeId = store?._id;
+    const organizationId = getId(store?.organizationId);
+    const today = dayKey(new Date());
 
     useEffect(() => {
         if (!organizationId || !storeId) return;
@@ -88,11 +99,32 @@ function StoreManagerOperationsContent({ activeSection = "employees" }) {
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <div>
-                <h1 className="text-xl font-bold text-[var(--text-primary)] sm:text-2xl">Store Manager Operations</h1>
-                <p className="mt-0.5 text-sm text-[var(--text-secondary)]">
-                    {store?.name || "Your assigned store"} · live employee and operations data
-                </p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                    <h1 className="text-xl font-bold text-[var(--text-primary)] sm:text-2xl">Store Manager Operations</h1>
+                    <p className="mt-0.5 text-sm text-[var(--text-secondary)]">
+                        {store?.name || "Your assigned store"} · live employee and operations data
+                    </p>
+                </div>
+                {stores.length > 1 && (
+                    <div className="flex items-center gap-2">
+                        <label htmlFor="store-op-select" className="text-xs text-[var(--text-secondary)]">
+                            Store:
+                        </label>
+                        <select
+                            id="store-op-select"
+                            value={store?._id || ""}
+                            onChange={(e) => setSelectedStoreId(e.target.value)}
+                            className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm font-medium text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                        >
+                            {stores.map((s) => (
+                                <option key={s._id} value={s._id}>
+                                    {s.name} ({s.code})
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
             </div>
             <div className="flex items-center gap-2 overflow-x-auto border-b border-[var(--border)] pb-1">
                 {tabs.map(({ id, label, icon: Icon }) => (

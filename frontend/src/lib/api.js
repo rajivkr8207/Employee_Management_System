@@ -29,12 +29,29 @@ api.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
+const PUBLIC_PATHS = [
+    "/login",
+    "/register",
+    "/forgot-password",
+    "/reset-password",
+    "/account-status",
+];
+
+function isPublicPath(pathname = "") {
+    return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+}
+
 function isAuthEndpoint(url = "") {
     return [
         "/auth/login",
         "/auth/register",
         "/auth/store-admin/register",
+        "/auth/store-admin/invitations/verify",
         "/auth/refresh-token",
+        "/auth/forgot-password",
+        "/auth/reset-password",
+        "/auth/verify-otp",
+        "/auth/resend-otp",
     ].some((endpoint) => url.includes(endpoint));
 }
 
@@ -82,7 +99,8 @@ api.interceptors.response.use(
             return api(request);
         } catch (refreshError) {
             authStore?.dispatch({ type: "auth/clearAuth" });
-            if (window.location.pathname !== "/login") {
+            const currentPath = window.location.pathname;
+            if (!isPublicPath(currentPath)) {
                 window.location.replace("/login");
             }
             return Promise.reject(refreshError);

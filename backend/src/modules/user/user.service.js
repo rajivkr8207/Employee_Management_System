@@ -365,3 +365,59 @@ export const resendUserOtp = async (email) => {
   }
   return user;
 };
+
+export const requestPasswordReset = async (email) => {
+  const normalizedEmail = email?.trim().toLowerCase();
+  if (!normalizedEmail) throw new ApiError(400, 'A valid email address is required');
+
+  const user = await User.findOne({ email: normalizedEmail });
+  if (!user) {
+    return { message: 'If an account exists with this email, a reset link has been sent.' };
+  }
+
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+  user.passwordResetToken = hashedToken;
+  user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000);
+  await user.save();
+
+  const frontendBase = Config.frontend_url || 'http://localhost:5173';
+  const resetUrl = `${frontendBase}/reset-password/${rawToken}`;
+
+  try {
+    await new MailService().SendPasswordResetMail(normalizedEmail, resetUrl, user.fullName);
+  } catch (err) {
+    console.error('[Password Reset Mail Error]:', err.message);
+  }
+
+  return { message: 'If an account exists with this email, a reset link has been sent.' };
+};
+
+export const resetPasswordWithToken = async (token, newPassword) => {
+  if (!token) throw new ApiError(400, 'Reset token is required');
+  if (!newPassword || newPassword.length < 6) {
+    throw new ApiError(400, 'Password must be at least 6 characters long');
+  }
+
+  const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+  const user = await User.findOne({
+    passwordResetToken: hashedToken,
+    passwordResetExpires: { $gt: new Date() },
+  }).select(
+    '+password +passwordResetToken +passwordResetExpires +refreshTokenHash +refreshTokenVersion',
+  );
+
+  if (!user) {
+    throw new ApiError(400, 'Reset token is invalid or has expired');
+  }
+
+  user.password = newPassword;
+  user.passwordResetToken = null;
+  user.passwordResetExpires = null;
+  user.refreshTokenHash = null;
+  user.refreshTokenVersion = (user.refreshTokenVersion || 0) + 1;
+  await user.save();
+
+  return { message: 'Password has been successfully reset. You can now log in.' };
+};

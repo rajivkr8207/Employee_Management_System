@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Plus, Users, Search, Trash2, Eye } from "lucide-react";
+import { Plus, Users, Search, Trash2, Eye, Pencil } from "lucide-react";
 import { toast } from "react-toastify";
-import { fetchEmployees, createEmployee, deleteEmployee } from "../employees.thunk";
+import { fetchEmployees, createEmployee, updateEmployee, deleteEmployee } from "../employees.thunk";
 import { fetchMyStores } from "../../store/store.thunk";
 
 const roleBadge = {
@@ -260,6 +260,134 @@ function AddEmployeeModal({ open, onClose, onSubmit, loading, stores, canAddMana
   );
 }
 
+function EditEmployeeModal({ open, employee, onClose, onSubmit, loading }) {
+  const [form, setForm] = useState({
+    designation: "",
+    salary: 0,
+    status: "active",
+    Dob: "",
+  });
+
+  useEffect(() => {
+    if (employee) {
+      setForm({
+        designation: employee.designation || "",
+        salary: employee.salary != null ? employee.salary : 0,
+        status: employee.status || "active",
+        Dob: employee.Dob || employee.dob ? new Date(employee.Dob || employee.dob).toISOString().slice(0, 10) : "",
+      });
+    }
+  }, [employee]);
+
+  const handleChange = (e) =>
+    setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!form.designation.trim()) {
+      toast.error("Designation is required");
+      return;
+    }
+    onSubmit({
+      designation: form.designation.trim(),
+      salary: Number(form.salary || 0),
+      status: form.status,
+      Dob: form.Dob || undefined,
+    });
+  };
+
+  if (!open || !employee) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-900">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Edit Employee Details
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors text-xl font-bold"
+          >
+            &times;
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Designation *
+            </label>
+            <input
+              name="designation"
+              value={form.designation}
+              onChange={handleChange}
+              placeholder="e.g. Sales Executive"
+              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Monthly Salary
+            </label>
+            <input
+              name="salary"
+              type="number"
+              min="0"
+              value={form.salary}
+              onChange={handleChange}
+              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Date of Birth
+            </label>
+            <input
+              name="Dob"
+              type="date"
+              value={form.Dob}
+              onChange={handleChange}
+              max={new Date().toISOString().slice(0, 10)}
+              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Status
+            </label>
+            <select
+              name="status"
+              value={form.status}
+              onChange={handleChange}
+              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="terminated">Terminated</option>
+            </select>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
+            >
+              {loading ? "Saving..." : "Save Changes"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function EmployeeListPage() {
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
@@ -271,6 +399,8 @@ export default function EmployeeListPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [viewTarget, setViewTarget] = useState(null);
+  const [editTarget, setEditTarget] = useState(null);
+  const [updating, setUpdating] = useState(false);
   const organizationId = stores[0]?.organizationId?._id || stores[0]?.organizationId;
 
   useEffect(() => {
@@ -333,6 +463,22 @@ export default function EmployeeListPage() {
       }
     } else {
       toast.error(res.payload || "Failed to add employee");
+    }
+  };
+
+  const handleEdit = async (data) => {
+    if (!editTarget) return;
+    setUpdating(true);
+    const res = await dispatch(updateEmployee({ id: editTarget._id, data }));
+    setUpdating(false);
+    if (!res.error) {
+      toast.success("Employee updated successfully!");
+      setEditTarget(null);
+      if (organizationId) {
+        dispatch(fetchEmployees({ organizationId, force: true }));
+      }
+    } else {
+      toast.error(res.payload || "Failed to update employee");
     }
   };
 
@@ -508,6 +654,14 @@ export default function EmployeeListPage() {
                         </button>
                         <button
                           type="button"
+                          onClick={() => setEditTarget(emp)}
+                          className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded transition-colors"
+                          aria-label={`Edit ${getName(emp)}`}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => setDeleteTarget(emp)}
                           className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
                         >
@@ -530,6 +684,14 @@ export default function EmployeeListPage() {
         loading={creating}
         stores={stores}
         canAddManager={canAddManager}
+      />
+
+      <EditEmployeeModal
+        open={Boolean(editTarget)}
+        employee={editTarget}
+        onClose={() => setEditTarget(null)}
+        onSubmit={handleEdit}
+        loading={updating}
       />
 
       {viewTarget && (
