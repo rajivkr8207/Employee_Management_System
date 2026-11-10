@@ -127,6 +127,7 @@ export const rejectStoreAdminAccount = asyncHandler(async (req, res) => {
 // ─────────────────────────────────────────────
 export const login = asyncHandler(async (req, res) => {
   const { identifier, password } = req.body;
+  console.log(req.body)
   const { user, accessToken, refreshToken } = await loginUser({ identifier, password });
   return res
     .status(200)
