@@ -25,6 +25,7 @@ const { organizationModel } = await import('../src/modules/organization/organiza
 const { StoreModel } = await import('../src/modules/store/store.model.js');
 const { EmployeeModel } = await import('../src/modules/employee/employee.model.js');
 const { default: ActivityLog } = await import('../src/modules/activityLog/activityLog.model.js');
+const { bootstrapInitialAdmin } = await import('../src/utils/bootstrapAdmin.js');
 const { connectTestDB, closeTestDB, clearTestDB } = await import('./setup.js');
 
 const createUser = async (username, role, properties = {}) =>
@@ -375,5 +376,29 @@ describe('Admin directory endpoints', () => {
         }),
       ]),
     );
+  });
+
+  describe('Initial Admin Bootstrapping', () => {
+    it('creates a default system admin account when database has no admin', async () => {
+      const res = await bootstrapInitialAdmin({
+        email: 'firstadmin@ems.com',
+        username: 'firstadmin',
+        password: 'AdminPassword123!',
+        fullName: 'Initial Root Admin',
+      });
+
+      expect(res.created).toBe(true);
+      const createdAdmin = await UserModel.findOne({ email: 'firstadmin@ems.com' });
+      expect(createdAdmin).toBeDefined();
+      expect(createdAdmin.role).toBe(ROLES.ADMIN);
+      expect(createdAdmin.isApproved).toBe(true);
+      expect(createdAdmin.isVerified).toBe(true);
+
+      // Calling again when admin exists should not create a duplicate
+      const secondCall = await bootstrapInitialAdmin({
+        email: 'secondadmin@ems.com',
+      });
+      expect(secondCall.created).toBe(false);
+    });
   });
 });

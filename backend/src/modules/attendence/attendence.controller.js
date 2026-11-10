@@ -48,7 +48,7 @@ export const checkInEmployee = asyncHandler(async (req, res) => {
       .status(201)
       .json(new ApiResponse(201, { attendance }, 'Check-in recorded successfully'));
   } catch (error) {
-    createNotification({
+    await createNotification({
       userId: req.user.id,
       title: 'Check-in Failed',
       message: `Check-in failed: ${error.message || 'Verification failed'}`,
@@ -93,7 +93,7 @@ export const checkOutEmployee = asyncHandler(async (req, res) => {
       .status(200)
       .json(new ApiResponse(200, { attendance }, 'Check-out recorded successfully'));
   } catch (error) {
-    createNotification({
+    await createNotification({
       userId: req.user.id,
       title: 'Check-out Failed',
       message: `Check-out failed: ${error.message || 'Verification failed'}`,
