@@ -4,6 +4,11 @@ import { StoreModel } from '../store/store.model.js';
 import { EmployeeModel } from '../employee/employee.model.js';
 import { ApiError } from '../../utils/ApiError.js';
 import { listActivityLogs } from '../activityLog/activityLog.service.js';
+import { getOrSetCache, deleteCache } from '../../utils/cache.js';
+import { invalidateUserCache } from '../../middlewares/auth.middleware.js';
+
+/** Invalidate the admin dashboard stats cache (call after store/user state changes). */
+export const invalidateDashboardCache = () => deleteCache('admin:dashboard:stats');
 
 const userFields =
   'fullName username email mobile avatar role isVerified isApproved approvalStatus rejectionReason isActive isBlocked createdAt';
@@ -167,6 +172,11 @@ export const reviewManagerVerification = async (managerId, status, reason = null
     manager.refreshTokenVersion += 1;
   }
   await manager.save();
+  // Invalidate cached user profile and dashboard stats after approval/rejection
+  await Promise.all([
+    invalidateUserCache(manager._id.toString()),
+    invalidateDashboardCache(),
+  ]);
   const updated = (await listAdminManagers(status)).find(
     (item) => item.id === managerId.toString(),
   );
@@ -175,6 +185,11 @@ export const reviewManagerVerification = async (managerId, status, reason = null
 };
 
 export const getAdminDashboardStats = async () => {
+  return getOrSetCache('admin:dashboard:stats', _fetchAdminDashboardStats, 60);
+};
+
+// eslint-disable-next-line no-underscore-dangle
+const _fetchAdminDashboardStats = async () => {
   const [
     totalUsers,
     verifiedUsers,

@@ -2,16 +2,19 @@ import request from 'supertest';
 import { jest } from '@jest/globals';
 import { ROLES } from '../src/constants/roles.js';
 
-jest.unstable_mockModule('../src/config/redis.js', () => ({
-  default: {
+jest.unstable_mockModule('../src/config/redis.js', () => {
+  const instance = {
     get: async () => null,
     set: async () => 'OK',
     setex: async () => 'OK',
     del: async () => 1,
+    scan: async () => ['0', []],
+    call: async () => 1,
     on: () => {},
     quit: async () => 'OK',
-  },
-}));
+  };
+  return { default: instance, redis: instance };
+});
 
 jest.unstable_mockModule('../src/services/mail.service.js', () => ({
   MailService: class {

@@ -4,6 +4,10 @@ import { ROLES } from '../constants/roles.js';
 import User from '../modules/user/user.model.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { getCache, setCache, deleteCache } from '../utils/cache.js';
+
+// TTL for cached user profile (10 minutes)
+const USER_CACHE_TTL = 600;
 
 export const verifyJWT = asyncHandler(async (req, res, next) => {
   const token = req.header('Authorization')?.replace('Bearer ', '') || req.cookies?.accessToken;
@@ -19,8 +23,22 @@ export const verifyJWT = asyncHandler(async (req, res, next) => {
     throw new ApiError(401, 'Invalid or expired access token');
   }
 
-  const user = await User.findById(decoded.id);
-  if (!user) throw new ApiError(401, 'User account was not found');
+  // ── P1.3: Token blacklist check ───────────────────────────────────────────
+  const blacklisted = await getCache(`blacklist:token:${token}`);
+  if (blacklisted) {
+    throw new ApiError(401, 'Token has been revoked. Please log in again.');
+  }
+
+  // ── P0.1: Cached user lookup ──────────────────────────────────────────────
+  const cacheKey = `auth:user:${decoded.id}`;
+  let user = await getCache(cacheKey);
+
+  if (!user) {
+    user = await User.findById(decoded.id).lean();
+    if (!user) throw new ApiError(401, 'User account was not found');
+    await setCache(cacheKey, user, USER_CACHE_TTL);
+  }
+
   if (!user.isActive || user.isBlocked) {
     throw new ApiError(403, 'Account is not active or blocked');
   }
@@ -34,14 +52,21 @@ export const verifyJWT = asyncHandler(async (req, res, next) => {
   }
 
   req.user = {
-    id: user.id,
+    id: user._id.toString(),
     fullName: user.fullName,
     role: user.role,
     email: user.email,
     isApproved: user.isApproved,
   };
+
+  // Store the raw token for logout invalidation downstream
+  req._accessToken = token;
+
   return next();
 });
+
+/** Invalidate a user's cached profile (call after any profile/status change). */
+export const invalidateUserCache = (userId) => deleteCache(`auth:user:${userId}`);
 
 export const verifyAdmin = (req, res, next) => {
   if (req.user?.role !== ROLES.ADMIN) {
@@ -56,3 +81,4 @@ export const verifyStoreAdmin = (req, res, next) => {
   }
   return next();
 };
+

@@ -20,6 +20,7 @@ import {
   resetPasswordWithToken,
 } from './user.service.js';
 import { enrollUserFace } from './face.service.js';
+import { deleteCache } from '../../utils/cache.js';
 
 const cookieOptions = {
   httpOnly: true,
@@ -94,6 +95,8 @@ export const enrollFace = asyncHandler(async (req, res) => {
     imageBuffer: req.file?.buffer,
     contentType: req.file?.mimetype,
   });
+  // Invalidate the face embedding cache so the next check-in loads fresh data
+  await deleteCache(`user:face-embedding:${req.user.id}`);
   return res
     .status(200)
     .json(new ApiResponse(200, { user }, 'Face enrollment completed successfully'));
@@ -146,7 +149,7 @@ export const login = asyncHandler(async (req, res) => {
 // POST /api/v1/auth/logout  [Protected]
 // ─────────────────────────────────────────────
 export const logout = asyncHandler(async (req, res) => {
-  await logoutUser(req.user.id);
+  await logoutUser(req.user.id, req._accessToken);
   return res
     .clearCookie('accessToken', cookieClearOptions)
     .clearCookie('refreshToken', cookieClearOptions)

@@ -6,6 +6,8 @@ redis.get = async () => null;
 redis.set = async () => 'OK';
 redis.setex = async () => 'OK';
 redis.del = async () => 1;
+redis.scan = async () => ['0', []];
+redis.call = async () => 1;
 redis.on = () => {};
 redis.quit = async () => 'OK';
 
