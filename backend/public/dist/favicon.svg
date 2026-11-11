@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="emsGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4f46e5" />
+      <stop offset="50%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#06b6d4" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#4f46e5" flood-opacity="0.3" />
+    </filter>
+  </defs>
+  <!-- Background Rounded Rect -->
+  <rect width="64" height="64" rx="16" fill="url(#emsGrad)" filter="url(#shadow)" />
+  <!-- Abstract Workforce Icon: Group & Node Hierarchy -->
+  <circle cx="32" cy="22" r="7" fill="#ffffff" />
+  <circle cx="18" cy="36" r="5" fill="#ffffff" opacity="0.9" />
+  <circle cx="46" cy="36" r="5" fill="#ffffff" opacity="0.9" />
+  <!-- Connecting Links -->
+  <path d="M 22 34 L 28 27" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" opacity="0.8" />
+  <path d="M 42 34 L 36 27" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" opacity="0.8" />
+  <!-- Base Pedestal / Team Arc -->
+  <path d="M 18 50 C 18 43, 46 43, 46 50" stroke="#ffffff" stroke-width="3" stroke-linecap="round" fill="none" />
+  <path d="M 24 43 C 24 37, 40 37, 40 43" stroke="#ffffff" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.9" />
+</svg>
+
