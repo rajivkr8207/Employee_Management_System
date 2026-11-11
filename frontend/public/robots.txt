@@ -1,0 +1,29 @@
+# Robots.txt for Employee Management System (EMS)
+# https://www.robotstxt.org/
+
+User-agent: *
+
+# Allow public informational and onboarding pages
+Allow: /
+Allow: /login
+Allow: /register
+Allow: /forgot-password
+Allow: /favicon.svg
+Allow: /site.webmanifest
+
+# Disallow private dashboards, management operations, and internal API routes
+Disallow: /admin/
+Disallow: /store-admin/
+Disallow: /manager/
+Disallow: /employee/
+Disallow: /dashboard/
+Disallow: /operations/
+Disallow: /profile/
+Disallow: /settings/
+Disallow: /account-status
+Disallow: /reset-password/
+Disallow: /api/
+
+# Host & Sitemap definition
+Sitemap: https://ems.example.com/sitemap.xml
+

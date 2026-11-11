@@ -155,11 +155,27 @@ export default function ActivityLogsPage() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-[var(--border)]">
-                                    {activityLogs.map((log) => {
+                                 {activityLogs.map((log) => {
                                         const result = outcomeDetails[log.outcome] || outcomeDetails.failure;
                                         const ResultIcon = result.Icon;
+                                        const isFailed = log.outcome === 'failure';
+
+                                        // Flatten structured details into readable lines
+                                        let detailLines = [];
+                                        if (isFailed && log.details?.errors) {
+                                            const errs = Array.isArray(log.details.errors)
+                                                ? log.details.errors
+                                                : Object.values(log.details.errors);
+                                            detailLines = errs.map((e) =>
+                                                typeof e === 'string' ? e : (e?.msg || e?.message || JSON.stringify(e)),
+                                            ).filter(Boolean);
+                                        }
+
                                         return (
-                                            <tr key={log._id} className="align-top">
+                                            <tr
+                                                key={log._id}
+                                                className={`align-top ${isFailed ? 'bg-[color-mix(in_srgb,var(--danger)_5%,transparent)]' : ''}`}
+                                            >
                                                 <td className="whitespace-nowrap px-5 py-4 text-sm text-[var(--text-secondary)]">
                                                     {formatTimestamp(log.createdAt)}
                                                 </td>
@@ -188,8 +204,18 @@ export default function ActivityLogsPage() {
                                                         HTTP {log.statusCode}
                                                     </p>
                                                 </td>
-                                                <td className="max-w-sm px-5 py-4 text-sm text-[var(--text-secondary)]">
-                                                    {log.message}
+                                                <td className="max-w-sm px-5 py-4 text-sm">
+                                                    <p className={isFailed ? 'text-[var(--danger)]' : 'text-[var(--text-secondary)]'}>
+                                                        {log.message}
+                                                    </p>
+                                                    {detailLines.length > 0 && (
+                                                        <ul className="mt-1.5 list-disc pl-4 text-xs text-[var(--danger)] opacity-80 space-y-0.5">
+                                                            {detailLines.map((line, i) => (
+                                                                // eslint-disable-next-line react/no-array-index-key
+                                                                <li key={i}>{line}</li>
+                                                            ))}
+                                                        </ul>
+                                                    )}
                                                 </td>
                                             </tr>
                                         );

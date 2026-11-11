@@ -53,4 +53,3 @@ export const bootstrapInitialAdmin = async ({
     return { created: false, error: error.message };
   }
 };
-

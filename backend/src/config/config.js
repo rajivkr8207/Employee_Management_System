@@ -27,9 +27,12 @@ const Config = {
   IMAGE_KIT: process.env.IMAGE_KIT,
 
   // Initial Admin Bootstrap (Used when no admin exists in database)
-  initial_admin_email: process.env.INITIAL_ADMIN_EMAIL || process.env.ADMIN_EMAIL || 'admin@ems.com',
-  initial_admin_password: process.env.INITIAL_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD || 'Admin@123456',
-  initial_admin_username: process.env.INITIAL_ADMIN_USERNAME || process.env.ADMIN_USERNAME || 'superadmin',
+  initial_admin_email:
+    process.env.INITIAL_ADMIN_EMAIL || process.env.ADMIN_EMAIL || 'admin@ems.com',
+  initial_admin_password:
+    process.env.INITIAL_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD || 'Admin@123456',
+  initial_admin_username:
+    process.env.INITIAL_ADMIN_USERNAME || process.env.ADMIN_USERNAME || 'superadmin',
   initial_admin_name: process.env.INITIAL_ADMIN_NAME || 'System Administrator',
 };
 

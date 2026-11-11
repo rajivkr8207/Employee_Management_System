@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff, Users } from "lucide-react";
 import useAuth from "../hooks/useAuth";
+import { SEO } from "../../../seo";
 
 export default function Login() {
     const { login, loginLoading, loginError, clearAllErrors } = useAuth();
@@ -43,6 +44,11 @@ export default function Login() {
 
     return (
         <div className="min-h-screen flex bg-[var(--background)]">
+            <SEO
+                title="Sign In"
+                description="Secure access portal for Administrators, Store Admins, Managers, and Employees."
+                keywords="EMS login, employee login, workforce portal, sign in"
+            />
             {/* ── Left panel (decorative) ── */}
             <div className="hidden lg:flex lg:w-1/2 bg-[var(--sidebar-bg)] flex-col items-center justify-center px-12 relative overflow-hidden">
                 {/* Grid pattern */}

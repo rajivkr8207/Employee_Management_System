@@ -16,7 +16,8 @@ const activityLogSchema = new mongoose.Schema(
     route: { type: String, required: true, trim: true, maxlength: 240 },
     outcome: { type: String, required: true, enum: ['success', 'failure'], index: true },
     statusCode: { type: Number, required: true },
-    message: { type: String, required: true, trim: true, maxlength: 300 },
+    message: { type: String, required: true, trim: true, maxlength: 1000 },
+    details: { type: mongoose.Schema.Types.Mixed, default: null },
   },
   { timestamps: { createdAt: true, updatedAt: false } },
 );

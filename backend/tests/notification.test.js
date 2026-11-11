@@ -88,7 +88,17 @@ const setupTestOrg = async () => {
     status: 'active',
   });
 
-  return { owner, ownerToken, empUser1, empToken1, empUser2, empToken2, organization, store1, store2 };
+  return {
+    owner,
+    ownerToken,
+    empUser1,
+    empToken1,
+    empUser2,
+    empToken2,
+    organization,
+    store1,
+    store2,
+  };
 };
 
 describe('Notification Module & Attendance Integration', () => {
@@ -213,7 +223,10 @@ describe('Notification Module & Attendance Integration', () => {
       .set('Authorization', `Bearer ${empToken1}`);
     expect(readAllRes.status).toBe(200);
 
-    const updatedCount = await NotificationModel.countDocuments({ userId: empUser1.id, isRead: false });
+    const updatedCount = await NotificationModel.countDocuments({
+      userId: empUser1.id,
+      isRead: false,
+    });
     expect(updatedCount).toBe(0);
   });
 
