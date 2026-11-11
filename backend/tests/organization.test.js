@@ -2,16 +2,19 @@ import request from 'supertest';
 import { jest } from '@jest/globals';
 import { ROLES } from '../src/constants/roles.js';
 
-jest.unstable_mockModule('../src/config/redis.js', () => ({
-  default: {
+jest.unstable_mockModule('../src/config/redis.js', () => {
+  const instance = {
     get: async () => null,
     set: async () => 'OK',
     setex: async () => 'OK',
     del: async () => 1,
+    scan: async () => ['0', []],
+    call: async () => 1,
     on: () => {},
     quit: async () => 'OK',
-  },
-}));
+  };
+  return { default: instance, redis: instance };
+});
 
 const { app } = await import('../src/app.js');
 const { default: UserModel } = await import('../src/modules/user/user.model.js');

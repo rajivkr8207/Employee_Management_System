@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import useAuth from "../hooks/useAuth";
 import { api } from "../../../lib/api";
+import { SEO } from "../../../seo";
 
 export default function Register() {
     const [searchParams] = useSearchParams();
@@ -192,6 +193,11 @@ export default function Register() {
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-[var(--background)] px-4 py-8">
+            <SEO
+                title="Register Store Administrator"
+                description="Complete onboarding and set up administrative credentials for your verified store organization."
+                keywords="EMS register, store admin onboarding, workforce account setup"
+            />
             <div className="w-full max-w-lg">
                 <div className="text-center mb-6">
                     <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[var(--primary-soft)] text-[var(--primary)] mb-3 shadow-sm">

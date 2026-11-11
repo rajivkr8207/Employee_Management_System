@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import AppRoutes from "../routes/AppRoutes";
 import { fetchProfileThunk } from "../features/auth/auth.thunk";
+import { RouteSEOTracker } from "../seo";
 
 function App() {
   const dispatch = useDispatch();
@@ -21,6 +22,7 @@ function App() {
 
   return (
     <>
+      <RouteSEOTracker />
       <AppRoutes />
     </>
   );

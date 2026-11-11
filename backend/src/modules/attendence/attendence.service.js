@@ -12,6 +12,7 @@ import {
   createFaceEmbedding,
   matchesFaceEmbedding,
 } from '../../services/faceRecognition.service.js';
+import { getOrSetCache, deleteCache } from '../../utils/cache.js';
 
 const attendanceRoles = ['owner', 'store_admin', 'manager'];
 const attendanceEmployeeFields = 'employeeCode designation userId';
@@ -113,19 +114,35 @@ const getDateKey = (date, timeZone) => {
 
 const getTodayContext = async ({ userId, organizationId, location }) => {
   const employee = await getActiveEmployee({ userId, organizationId });
-  const store = await StoreModel.findById(employee.storeId).select('name location timeZone');
+
+  // ── P1.1: Cache store geofence (location + radius) for 2 hours ───────────
+  const store = await getOrSetCache(
+    `store:geofence:${employee.storeId}`,
+    () => StoreModel.findById(employee.storeId).select('name location timeZone').lean(),
+    7200,
+  );
   if (!store) throw new ApiError(404, 'Employee store was not found');
+
   const timeZone = store.timeZone || 'Asia/Kolkata';
   const now = new Date();
   const dateKey = getDateKey(now, timeZone);
   const date = new Date(`${dateKey}T00:00:00.000Z`);
-  const [assignment, attendance, user] = await Promise.all([
+
+  // ── P1.1: Cache face embedding for 24 hours ───────────────────────────────
+  const [assignment, attendance, faceEmbedding] = await Promise.all([
     ShiftAssignmentModel.findOne({ employeeId: employee._id, date: dateKey }).populate(
       'shiftId',
       'name startTime endTime status',
     ),
     AttendanceModel.findOne({ employeeId: employee._id, date }),
-    User.findById(employee.userId).select('+faceEmbedding'),
+    getOrSetCache(
+      `user:face-embedding:${employee.userId}`,
+      async () => {
+        const u = await User.findById(employee.userId).select('+faceEmbedding').lean();
+        return u?.faceEmbedding || [];
+      },
+      86400,
+    ),
   ]);
 
   const exactDistance = location
@@ -161,8 +178,8 @@ const getTodayContext = async ({ userId, organizationId, location }) => {
     store,
     assignment,
     attendance,
-    faceEnrolled: user?.faceEmbedding?.length === 128,
-    faceEmbedding: user?.faceEmbedding,
+    faceEnrolled: Array.isArray(faceEmbedding) && faceEmbedding.length === 128,
+    faceEmbedding,
     distanceMeters,
     radius,
     insideGeofence,
@@ -211,8 +228,8 @@ const haversineDistance = (first, second) => {
   const value =
     Math.sin(latitudeDifference / 2) ** 2 +
     Math.cos(radians(first.lat)) *
-      Math.cos(radians(second.lat)) *
-      Math.sin(longitudeDifference / 2) ** 2;
+    Math.cos(radians(second.lat)) *
+    Math.sin(longitudeDifference / 2) ** 2;
   return 6_371_000 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
 };
 

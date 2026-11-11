@@ -8,6 +8,13 @@ import { EmployeeModel } from '../employee/employee.model.js';
 import { MailService } from '../../services/mail.service.js';
 import Config from '../../config/config.js';
 import crypto from 'crypto';
+import { getOrSetCache, deleteCache, deleteCacheByPattern } from '../../utils/cache.js';
+
+export const invalidateStoreCaches = (storeId) =>
+  Promise.all([
+    storeId ? deleteCache(`store:geofence:${storeId}`) : Promise.resolve(),
+    deleteCacheByPattern('stores:user:*'),
+  ]);
 
 const populateManager = (query) => query.populate('managerId', 'fullName username role');
 
@@ -46,22 +53,28 @@ const pickStoreFields = (storeData, fields) =>
   );
 
 export const listStores = async (userId, role) => {
-  if (role === ROLES.MANAGER) {
-    const memberships = await MembershipModel.find({
-      userId,
-      role: 'manager',
-      status: 'active',
-    }).select('storeIds');
-    const assignedStoreIds = memberships.flatMap((membership) => membership.storeIds);
-    return populateManager(
-      StoreModel.find({
-        $or: [{ managerId: userId }, { _id: { $in: assignedStoreIds } }],
-        status: 'active',
-      }).sort({ createdAt: -1 }),
-    );
-  }
+  return getOrSetCache(
+    `stores:user:${userId}:${role}`,
+    async () => {
+      if (role === ROLES.MANAGER) {
+        const memberships = await MembershipModel.find({
+          userId,
+          role: 'manager',
+          status: 'active',
+        }).select('storeIds');
+        const assignedStoreIds = memberships.flatMap((membership) => membership.storeIds);
+        return populateManager(
+          StoreModel.find({
+            $or: [{ managerId: userId }, { _id: { $in: assignedStoreIds } }],
+            status: 'active',
+          }).sort({ createdAt: -1 }),
+        ).lean();
+      }
 
-  return populateManager(StoreModel.find({ createdBy: userId }).sort({ createdAt: -1 }));
+      return populateManager(StoreModel.find({ createdBy: userId }).sort({ createdAt: -1 })).lean();
+    },
+    900,
+  );
 };
 
 export const getStore = async (storeId, storeAdminId) => {
@@ -88,6 +101,7 @@ export const createStore = async (storeData, storeAdminId) => {
       status: 'inactive',
       verificationStatus: 'pending',
     });
+    await invalidateStoreCaches(store._id);
   } catch (error) {
     if (error.code === 11000 && error.keyPattern?.createdBy) {
       throw new ApiError(409, 'Each store administrator can create only one store');
@@ -124,6 +138,7 @@ export const updateStore = async (storeId, storeData, storeAdminId) => {
     ),
   );
   if (!store) throw new ApiError(404, 'Store was not found');
+  await invalidateStoreCaches(storeId);
   return store;
 };
 
@@ -146,6 +161,7 @@ export const deleteStore = async (storeId, storeAdminId) => {
   await MembershipModel.updateMany({ storeIds: storeId }, { $pull: { storeIds: storeId } });
 
   await StoreModel.deleteOne({ _id: storeId });
+  await invalidateStoreCaches(storeId);
 };
 
 export const createStoreManager = async (storeId, managerData, storeAdminId) => {
@@ -260,6 +276,8 @@ export const createStoreManager = async (storeId, managerData, storeAdminId) => 
   } catch (err) {
     console.error('[Manager Credentials Mail Error]:', err.message);
   }
+
+  await invalidateStoreCaches(store._id);
 
   return {
     manager: {
@@ -390,5 +408,6 @@ export const removeStoreManager = async (storeId, managerId, storeAdminId) => {
       await manager.save();
     }
   }
+  await invalidateStoreCaches(store._id);
   return { managerId };
 };

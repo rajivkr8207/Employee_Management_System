@@ -50,4 +50,3 @@ run().catch((err) => {
   console.error('Failed to seed admin:', err);
   process.exit(1);
 });
-

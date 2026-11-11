@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { Lock, Eye, EyeOff, CheckCircle2, ShieldAlert } from "lucide-react";
 import { api } from "../../../lib/api";
+import { SEO } from "../../../seo";
 
 export default function ResetPassword() {
   const { token } = useParams();
@@ -43,6 +44,11 @@ export default function ResetPassword() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--background)] px-4 py-12">
+      <SEO
+        title="Reset Password"
+        description="Set a new secure password for your employee portal account."
+        noindex
+      />
       <div className="w-full max-w-md bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-8 shadow-xl">
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-[var(--text-primary)]">Reset Password</h2>

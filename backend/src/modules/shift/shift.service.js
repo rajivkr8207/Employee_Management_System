@@ -4,6 +4,14 @@ import { StoreModel } from '../store/store.model.js';
 import { ShiftModel } from './shift.model.js';
 import { ShiftAssignmentModel } from './shift-assignment.model.js';
 import { EmployeeModel } from '../employee/employee.model.js';
+import { getOrSetCache, deleteCacheByPattern } from '../../utils/cache.js';
+
+/** Invalidate cached shift data for an org/store pair. */
+const invalidateShiftCache = (organizationId, storeId) =>
+  Promise.all([
+    deleteCacheByPattern(`shifts:list:${organizationId}:*`),
+    storeId ? deleteCacheByPattern(`shifts:assign:${storeId}:*`) : Promise.resolve(),
+  ]);
 
 const populateShift = (query) =>
   query.populate('organizationId', 'name').populate('storeId', 'name code');
@@ -58,6 +66,16 @@ export const listShiftAssignments = async ({ userId, organizationId, storeId, da
   if (storeId) query.storeId = storeId;
   else if (allowedStoreIds) query.storeId = { $in: allowedStoreIds };
   if (date) query.date = date;
+
+  // Cache per-store daily assignment lookups (most common pattern)
+  if (storeId && date) {
+    return getOrSetCache(
+      `shifts:assign:${storeId}:${date}`,
+      () => populateAssignment(ShiftAssignmentModel.find(query).sort({ date: 1, createdAt: 1 })).lean(),
+      900, // 15 min
+    );
+  }
+
   return populateAssignment(ShiftAssignmentModel.find(query).sort({ date: 1, createdAt: 1 }));
 };
 
@@ -92,6 +110,7 @@ export const createShiftAssignment = async (assignmentData, userId) => {
       date,
       createdBy: userId,
     });
+    await invalidateShiftCache(organizationId, storeId);
     return populateAssignment(ShiftAssignmentModel.findById(assignment._id));
   } catch (error) {
     if (error.code === 11000) {
@@ -113,6 +132,7 @@ export const deleteShiftAssignment = async ({ userId, organizationId, assignment
     allowedRoles: ['owner', 'store_admin', 'manager'],
   });
   await ShiftAssignmentModel.deleteOne({ _id: assignmentId, organizationId });
+  await invalidateShiftCache(organizationId, assignment.storeId);
 };
 
 export const createShift = async (shiftData, userId) => {
@@ -136,6 +156,7 @@ export const createShift = async (shiftData, userId) => {
     storeId,
     ...pickShiftFields(shiftData, ['name', 'startTime', 'endTime', 'status']),
   });
+  await invalidateShiftCache(organizationId, storeId);
   return populateShift(ShiftModel.findById(shift._id));
 };
 
@@ -149,7 +170,14 @@ export const listShifts = async ({ userId, organizationId, storeId }) => {
   const query = { organizationId };
   if (storeId) query.storeId = storeId;
   else if (allowedStoreIds) query.storeId = { $in: allowedStoreIds };
-  return populateShift(ShiftModel.find(query).sort({ createdAt: -1 }));
+
+  // Cache per org+store for 30 minutes
+  const cacheKey = `shifts:list:${organizationId}:${storeId || 'all'}`;
+  return getOrSetCache(
+    cacheKey,
+    () => populateShift(ShiftModel.find(query).sort({ createdAt: -1 })).lean(),
+    1800,
+  );
 };
 
 export const getShift = async ({ userId, organizationId, shiftId }) => {
@@ -183,11 +211,13 @@ export const updateShift = async ({ userId, organizationId, shiftId, shiftData }
     ),
   );
   if (!shift) throw new ApiError(404, 'Shift was not found');
+  await invalidateShiftCache(organizationId, currentShift.storeId);
   return shift;
 };
 
 export const deleteShift = async ({ userId, organizationId, shiftId }) => {
-  await getAccessibleShift({ userId, organizationId, shiftId });
+  const currentShift = await getAccessibleShift({ userId, organizationId, shiftId });
   const shift = await ShiftModel.findOneAndDelete({ _id: shiftId, organizationId });
   if (!shift) throw new ApiError(404, 'Shift was not found');
+  await invalidateShiftCache(organizationId, currentShift.storeId);
 };

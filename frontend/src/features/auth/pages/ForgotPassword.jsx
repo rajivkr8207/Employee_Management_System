@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Mail, ArrowLeft, CheckCircle2, ShieldAlert } from "lucide-react";
 import { api } from "../../../lib/api";
+import { SEO } from "../../../seo";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -29,6 +30,10 @@ export default function ForgotPassword() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--background)] px-4 py-12">
+      <SEO
+        title="Forgot Password"
+        description="Request a secure password recovery email for your employee management portal account."
+      />
       <div className="w-full max-w-md bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-8 shadow-xl">
         <div className="mb-6">
           <Link

@@ -21,7 +21,16 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['info', 'alert', 'leave', 'shift', 'payroll', 'approval', 'attendance', 'announcement'],
+      enum: [
+        'info',
+        'alert',
+        'leave',
+        'shift',
+        'payroll',
+        'approval',
+        'attendance',
+        'announcement',
+      ],
       default: 'info',
       index: true,
     },
