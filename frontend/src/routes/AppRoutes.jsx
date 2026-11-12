@@ -2,9 +2,6 @@ import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 
-// Layout
-import AppLayout from "../components/layout/AppLayout";
-
 // Auth pages & guards
 import ProtectedRoute from "../features/auth/components/ProtectedRoute";
 import PublicRoute from "../features/auth/components/PublicRoute";
@@ -19,6 +16,8 @@ const PageLoader = () => (
     Loading page...
   </div>
 );
+
+const AppLayout = lazy(() => import("../components/layout/AppLayout"));
 
 const Login = lazy(() => import("../features/auth/pages/Login"));
 const Register = lazy(() => import("../features/auth/pages/Register"));

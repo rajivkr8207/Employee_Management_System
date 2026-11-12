@@ -15,21 +15,21 @@
 - SMTP connectivity is verified at server startup and logged; missing or failed SMTP configuration is reported without blocking API startup.
 - Production-grade fixes for broken routes, stale UI logic, store safety checks, and rollback handling were completed.
 - Database indexing and pagination improvements were added to support real-world scale.
-- Frontend route-based lazy loading is implemented and the production build succeeds. The latest build still emits a 406 KB minified entry chunk, so the original <350 KB target is not met.
+- Frontend route and protected-layout lazy loading are implemented and the production build succeeds. The entry chunk is now 364.42 KB minified (111.83 KB gzip), down from 406.93 KB; the original <350 KB target is not met yet.
 - Redis-backed cache-aside utilities are integrated for user profiles, admin dashboard statistics, face embeddings, store geofence data, stores, and shifts. Token revocation and a Redis rate-limit store are also wired in.
-- A first frontend test suite now covers auth state and protected-route behavior (5 tests across 2 files).
+- Frontend tests cover auth state and route behavior (7 tests across 2 files).
 
 ### Still Missing / Needs Verification
 - Redis caching for organization membership/permission checks is not implemented. Redis outage behavior for the distributed rate limiter has not been validated; cache helper fallback alone does not prove rate-limit fallback.
 - The frontend test suite is only a starting point: employee forms, password recovery, attendance, and manager workflows still need focused tests.
-- Further bundle-size reduction is needed: the current entry chunk is 406 KB minified, above the documented 350 KB goal.
+- Further bundle-size reduction is needed: the current entry chunk is 364.42 KB minified, above the documented 350 KB goal.
 - Bulk employee import/export.
 - Employee document vault.
 - Biometric liveness / anti-spoofing remains optional and requires product, privacy, and legal approval.
 
 ### Next Steps
 1. Validate Redis-backed rate limiting with Redis available and unavailable; document the actual failure behavior and add a focused integration check.
-2. Reduce the remaining 406 KB frontend entry chunk toward the <350 KB target, using build output to identify large shared dependencies.
+2. Reduce the remaining 364.42 KB frontend entry chunk toward the <350 KB target, using build output to identify large shared dependencies.
 3. Expand frontend tests around password recovery, employee mutation, and role/store access flows.
 4. Build CSV employee import/export after defining validation, duplicate handling, authorization, and error-report requirements.
 5. Defer the document vault and biometric liveness until product scope and privacy/retention requirements are approved.
@@ -157,7 +157,7 @@ These items represent optimizations and secondary enhancements for enterprise-sc
 │                                                                        │
 │ 1. Frontend Bundle Size Follow-up                                      │
 │    - Route-level React.lazy code splitting is implemented.             │
-│    - Remaining: reduce the 406 KB minified entry chunk below 350 KB.   │
+│    - Remaining: reduce the 364.42 KB minified entry chunk below 350 KB.│
 │                                                                        │
 │ 2. Redis Reliability & Coverage                                        │
 │    - User, dashboard, attendance, store, shift caches are integrated. │
@@ -211,13 +211,14 @@ These items represent optimizations and secondary enhancements for enterprise-sc
 | **Frontend** | Topbar Notification Drawer & Badge | ✅ Implemented | Phase 2 |
 | **Frontend** | Store Admin Broadcast Modal | ✅ Implemented | Phase 2+ |
 | **Frontend** | Employee Self-Service Payslip View | ✅ Implemented | Phase 2 |
-| **Frontend** | Route Code-Splitting (`React.lazy`) | ✅ Implemented; entry chunk remains 406 KB minified | Phase 3 |
+| **Frontend** | Route Code-Splitting (`React.lazy`) | ✅ Implemented; entry chunk is 364.42 KB minified | Phase 3 |
 | **Frontend** | Vitest / React Testing Library Suite | 🟡 Initial 5 auth tests passing; workflow coverage incomplete | Phase 3 |
 
 ---
 
 ## 7. Verification & Test Compliance
 * **Backend Unit & Integration Tests:** Ran `npm test -- --runInBand` in `backend/`; 10 suites / 56 tests passed.
-* **Frontend Tests:** `npm test` runs Vitest; current initial suite passes 5 tests across 2 files.
-* **Production Build:** Vite production build succeeds (`npm run build` in `frontend/`); latest output includes a 406 KB minified entry chunk.
+* **Frontend Tests:** `npm test` runs Vitest; the current suite passes 7 tests across 2 files.
+* **Production Build:** Vite production build succeeds (`npm run build` in `frontend/`); latest output includes a 364.42 KB minified entry chunk (111.83 KB gzip).
+* **Lighthouse:** Local production preview scored 100 for `/` and `/login` (FCP/LCP 0.9 s, TBT 0 ms). Hosted scores can differ with API availability, hosting, and network conditions.
 * **Container Orchestration:** Multi-service `docker-compose.yml` (`mongodb`, `backend`, `frontend`) configured with watch mode.

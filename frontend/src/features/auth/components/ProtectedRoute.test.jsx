@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { configureStore } from '@reduxjs/toolkit';
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import authReducer from '../auth.slice';
 import ProtectedRoute from './ProtectedRoute';
+import PublicRoute from './PublicRoute';
+
+afterEach(cleanup);
 
 const renderProtectedRoute = (auth, initialEntry = '/protected') => {
   const store = configureStore({
@@ -28,6 +31,17 @@ const renderProtectedRoute = (auth, initialEntry = '/protected') => {
 };
 
 describe('ProtectedRoute', () => {
+  it('keeps protected content gated while the session is initializing', () => {
+    renderProtectedRoute({
+      isAuthenticated: false,
+      isInitializing: true,
+      user: null,
+    });
+
+    expect(screen.getByText('Loading your profile...')).toBeTruthy();
+    expect(screen.queryByText('Login page')).toBeNull();
+  });
+
   it('redirects signed-out visitors to login', () => {
     renderProtectedRoute({ isAuthenticated: false, user: null });
 
@@ -50,5 +64,30 @@ describe('ProtectedRoute', () => {
     });
 
     expect(screen.getByText('Protected content')).toBeTruthy();
+  });
+});
+
+describe('PublicRoute', () => {
+  it('renders public content while the session is initializing', () => {
+    const store = configureStore({
+      reducer: { auth: authReducer },
+      preloadedState: {
+        auth: { isAuthenticated: false, isInitializing: true, user: null },
+      },
+    });
+
+    render(
+      <Provider store={store}>
+        <MemoryRouter initialEntries={['/login']}>
+          <Routes>
+            <Route element={<PublicRoute />}>
+              <Route path="/login" element={<p>Login page</p>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </Provider>,
+    );
+
+    expect(screen.getByText('Login page')).toBeTruthy();
   });
 });

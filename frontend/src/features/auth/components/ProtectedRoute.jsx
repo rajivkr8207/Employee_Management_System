@@ -3,7 +3,15 @@ import { useSelector } from "react-redux";
 import { normalizeRole, ROLES } from "../../../constants/roles";
 
 export default function ProtectedRoute() {
-    const { isAuthenticated, user } = useSelector((state) => state.auth);
+    const { isAuthenticated, isInitializing, user } = useSelector((state) => state.auth);
+
+    if (isInitializing) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-[var(--background)] text-[var(--text-secondary)]">
+                Loading your profile...
+            </div>
+        );
+    }
 
     if (!isAuthenticated) {
         return <Navigate to="/login" replace />;
