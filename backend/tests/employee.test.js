@@ -194,6 +194,74 @@ describe('Employee and membership flow', () => {
     expect((await EmployeeModel.findOne({ userId: createdUser.id })).salary).toBe(25000);
   });
 
+  it('rejects organization ids that do not match the employee store', async () => {
+    const { user: owner, token } = await createUser('mismatchedorgowner');
+    const { stores } = await createOrganizationAndStores(owner.id);
+    const otherOwner = await createUser('otherorgowner');
+    const otherOrganization = await organizationModel.create({
+      name: 'Other Organization',
+      email: 'other-employee-org@example.com',
+      ownerId: otherOwner.user.id,
+      verificationStatus: 'approved',
+    });
+
+    const response = await request(app)
+      .post('/api/v1/employees')
+      .set('Cookie', `accessToken=${token}`)
+      .send({
+        ...employeeDetails(otherOrganization.id, stores[0].id),
+        user: {
+          fullName: 'Mismatched Organization Employee',
+          username: 'mismatchedorgemployee',
+          email: 'mismatchedorgemployee@example.com',
+          password: 'Password123',
+        },
+      });
+
+    expect(response.statusCode).toBe(400);
+    expect(await UserModel.exists({ username: 'mismatchedorgemployee' })).toBeNull();
+    expect(await EmployeeModel.countDocuments()).toBe(0);
+    expect(await MembershipModel.countDocuments()).toBe(0);
+  });
+
+  it('rejects membership store ids that belong to another organization', async () => {
+    const { user: owner, token } = await createUser('crossorgstoreowner');
+    const { organization, stores } = await createOrganizationAndStores(owner.id);
+    const otherOwner = await createUser('crossorgotherowner');
+    const otherOrganization = await organizationModel.create({
+      name: 'Other Store Organization',
+      email: 'crossorg-other@example.com',
+      ownerId: otherOwner.user.id,
+      verificationStatus: 'approved',
+    });
+    const otherStore = await StoreModel.create({
+      organizationId: otherOrganization.id,
+      name: 'Foreign Store',
+      code: 'CROSS-ORG-STORE',
+      location: { lat: 19, lng: 72 },
+      createdBy: otherOwner.user.id,
+    });
+
+    const response = await request(app)
+      .post('/api/v1/employees')
+      .set('Cookie', `accessToken=${token}`)
+      .send({
+        ...employeeDetails(organization.id, stores[0].id),
+        storeIds: [stores[0].id, otherStore.id],
+        user: {
+          fullName: 'Cross Organization Employee',
+          username: 'crossorgemployee',
+          email: 'crossorgemployee@example.com',
+          password: 'Password123',
+        },
+      });
+
+    expect(response.statusCode).toBe(400);
+    expect(await UserModel.exists({ username: 'crossorgemployee' })).toBeNull();
+    expect(await EmployeeModel.countDocuments()).toBe(0);
+    expect(await MembershipModel.countDocuments()).toBe(0);
+  });
+
   it('adds an existing user and rejects duplicate membership or employee code', async () => {
     const { user: owner, token } = await createUser('existingflowowner');
     const { organization, stores } = await createOrganizationAndStores(owner.id);
@@ -234,6 +302,36 @@ describe('Employee and membership flow', () => {
       .send({ ...payload, userId: otherUser.id });
     expect(duplicateCode.statusCode).toBe(409);
     expect(await EmployeeModel.countDocuments({ organizationId: organization.id })).toBe(1);
+  });
+
+  it('keeps only one employee when concurrent requests reuse the same organization code', async () => {
+    const { user: owner, token } = await createUser('concurrentemployeeowner');
+    const { organization, stores } = await createOrganizationAndStores(owner.id);
+    const createRequest = (suffix) =>
+      request(app)
+        .post('/api/v1/employees')
+        .set('Cookie', `accessToken=${token}`)
+        .send({
+          ...employeeDetails(organization.id, stores[0].id),
+          employeeCode: 'RACE-EMP-001',
+          user: {
+            fullName: `Concurrent Employee ${suffix}`,
+            username: `concurrentemployee${suffix}`,
+            email: `concurrentemployee${suffix}@example.com`,
+            password: 'Password123',
+          },
+        });
+
+    const responses = await Promise.all([createRequest('one'), createRequest('two')]);
+
+    expect(responses.map(({ statusCode }) => statusCode).sort()).toEqual([201, 409]);
+    expect(await EmployeeModel.countDocuments({ organizationId: organization.id })).toBe(1);
+    expect(await MembershipModel.countDocuments({ organizationId: organization.id })).toBe(1);
+    expect(
+      await UserModel.countDocuments({
+        username: { $in: ['concurrentemployeeone', 'concurrentemployeetwo'] },
+      }),
+    ).toBe(1);
   });
 
   it('limits staff listing to active membership roles and assigned stores', async () => {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Send, AlertCircle, CheckCircle2, Megaphone } from "lucide-react";
+import { Send, AlertCircle, CheckCircle2 } from "lucide-react";
 import Modal from "../../components/ui/Modal";
 import Button from "../../components/ui/Button";
 import { notificationService } from "./notificationService";
@@ -8,7 +8,7 @@ import { storeService } from "../store/services/storeService";
 
 export default function BroadcastNotificationModal({ isOpen, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
-  const [initLoading, setInitLoading] = useState(false);
+  const [initLoading, setInitLoading] = useState(true);
   const [organization, setOrganization] = useState(null);
   const [stores, setStores] = useState([]);
   const [error, setError] = useState("");
@@ -22,40 +22,51 @@ export default function BroadcastNotificationModal({ isOpen, onClose, onSuccess 
   });
 
   useEffect(() => {
-    if (isOpen) {
-      setError("");
-      setSuccess(false);
-      setFormData({
-        title: "",
-        message: "",
-        type: "announcement",
-        storeId: "",
-      });
+    if (!isOpen) return undefined;
+    let active = true;
+    const loadData = async () => {
+      const [orgRes, storeRes] = await Promise.allSettled([
+        organizationService.getMyOrganization(),
+        storeService.getMyStores(),
+      ]);
+      if (!active) return;
 
-      const loadData = async () => {
-        setInitLoading(true);
-        try {
-          const [orgRes, storeRes] = await Promise.allSettled([
-            organizationService.getMyOrganization(),
-            storeService.getMyStores(),
-          ]);
+      if (orgRes.status === "fulfilled" && orgRes.value.data?.data?.organization) {
+        setOrganization(orgRes.value.data.data.organization);
+      }
+      if (storeRes.status === "fulfilled" && storeRes.value.data?.data?.stores) {
+        setStores(storeRes.value.data.data.stores);
+      }
 
-          if (orgRes.status === "fulfilled" && orgRes.value.data?.data?.organization) {
-            setOrganization(orgRes.value.data.data.organization);
-          }
-          if (storeRes.status === "fulfilled" && storeRes.value.data?.data?.stores) {
-            setStores(storeRes.value.data.data.stores);
-          }
-        } catch {
-          // Fallback
-        } finally {
-          setInitLoading(false);
-        }
-      };
+      if (orgRes.status === "rejected" || storeRes.status === "rejected") {
+        const failure = orgRes.status === "rejected" ? orgRes.reason : storeRes.reason;
+        setError(
+          failure?.response?.data?.message ||
+            failure?.message ||
+            "Unable to load organization and store details.",
+        );
+      }
+      setInitLoading(false);
+    };
 
-      loadData();
-    }
+    void loadData();
+    return () => {
+      active = false;
+    };
   }, [isOpen]);
+
+  const handleClose = () => {
+    setError("");
+    setSuccess(false);
+    setFormData({
+      title: "",
+      message: "",
+      type: "announcement",
+      storeId: "",
+    });
+    setInitLoading(true);
+    onClose();
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -84,7 +95,7 @@ export default function BroadcastNotificationModal({ isOpen, onClose, onSuccess 
       setSuccess(true);
       if (onSuccess) onSuccess();
       setTimeout(() => {
-        onClose();
+        handleClose();
       }, 1200);
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Failed to broadcast notification");
@@ -96,7 +107,7 @@ export default function BroadcastNotificationModal({ isOpen, onClose, onSuccess 
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleClose}
       title="Broadcast Announcement"
       size="md"
     >

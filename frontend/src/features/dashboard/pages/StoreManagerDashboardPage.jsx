@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { Clock3, MapPin, Users, Store } from "lucide-react";
+import { Clock3, MapPin, Users } from "lucide-react";
 import Badge from "../../../components/ui/Badge";
 import Button from "../../../components/ui/Button";
 import Card from "../../../components/ui/Card";
@@ -30,16 +30,7 @@ export default function StoreManagerDashboardPage() {
         dispatch(fetchMyStores());
     }, [dispatch]);
 
-    useEffect(() => {
-        if (stores?.length > 0 && (!selectedStoreId || !stores.some((s) => s._id === selectedStoreId))) {
-            setSelectedStoreId(stores[0]._id);
-        }
-    }, [stores, selectedStoreId]);
-
-    const store = useMemo(
-        () => stores.find((s) => s._id === selectedStoreId) || stores[0],
-        [stores, selectedStoreId]
-    );
+    const store = stores.find((s) => s._id === selectedStoreId) || stores[0];
     const organizationId = store?.organizationId?._id || store?.organizationId;
 
     useEffect(() => {

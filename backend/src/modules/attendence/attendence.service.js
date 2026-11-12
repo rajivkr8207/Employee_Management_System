@@ -12,7 +12,7 @@ import {
   createFaceEmbedding,
   matchesFaceEmbedding,
 } from '../../services/faceRecognition.service.js';
-import { getOrSetCache, deleteCache } from '../../utils/cache.js';
+import { getOrSetCache } from '../../utils/cache.js';
 
 const attendanceRoles = ['owner', 'store_admin', 'manager'];
 const attendanceEmployeeFields = 'employeeCode designation userId';
@@ -228,8 +228,8 @@ const haversineDistance = (first, second) => {
   const value =
     Math.sin(latitudeDifference / 2) ** 2 +
     Math.cos(radians(first.lat)) *
-    Math.cos(radians(second.lat)) *
-    Math.sin(longitudeDifference / 2) ** 2;
+      Math.cos(radians(second.lat)) *
+      Math.sin(longitudeDifference / 2) ** 2;
   return 6_371_000 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
 };
 

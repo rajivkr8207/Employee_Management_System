@@ -1,8 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSelector } from "react-redux";
 import { Plus, Building2, Briefcase, Trash2, Edit2, Search } from "lucide-react";
 import { toast } from "react-toastify";
 import { departmentService } from "../services/departmentService";
+
+const loadDepartmentData = (organizationId) =>
+  Promise.all([
+    departmentService.getDepartments({ organizationId }),
+    departmentService.getDesignations({ organizationId }),
+  ]);
 
 export default function DepartmentsPage() {
   const { stores } = useSelector((state) => state.store || { stores: [] });
@@ -11,8 +17,11 @@ export default function DepartmentsPage() {
   const [activeTab, setActiveTab] = useState("departments");
   const [departments, setDepartments] = useState([]);
   const [designations, setDesignations] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadedOrganizationId, setLoadedOrganizationId] = useState(null);
   const [search, setSearch] = useState("");
+  const loading =
+    refreshing || Boolean(organizationId && loadedOrganizationId !== organizationId);
 
   const [showDeptModal, setShowDeptModal] = useState(false);
   const [deptForm, setDeptForm] = useState({ name: "", code: "", description: "" });
@@ -26,26 +35,48 @@ export default function DepartmentsPage() {
     baseSalary: 0,
   });
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!organizationId) return;
-    setLoading(true);
     try {
-      const [deptRes, desigRes] = await Promise.all([
-        departmentService.getDepartments({ organizationId }),
-        departmentService.getDesignations({ organizationId }),
-      ]);
+      const [deptRes, desigRes] = await loadDepartmentData(organizationId);
       setDepartments(deptRes.data?.data?.departments || []);
       setDesignations(desigRes.data?.data?.designations || []);
     } catch (err) {
       toast.error(err?.response?.data?.message || "Failed to load data");
     } finally {
-      setLoading(false);
+      setLoadedOrganizationId(organizationId);
     }
-  };
+  }, [organizationId]);
 
   useEffect(() => {
-    fetchData();
+    if (!organizationId) return undefined;
+    let active = true;
+    const loadData = async () => {
+      try {
+        const [deptRes, desigRes] = await loadDepartmentData(organizationId);
+        if (!active) return;
+        setDepartments(deptRes.data?.data?.departments || []);
+        setDesignations(desigRes.data?.data?.designations || []);
+      } catch (err) {
+        if (active) toast.error(err?.response?.data?.message || "Failed to load data");
+      } finally {
+        if (active) setLoadedOrganizationId(organizationId);
+      }
+    };
+    void loadData();
+    return () => {
+      active = false;
+    };
   }, [organizationId]);
+
+  const refreshData = async () => {
+    setRefreshing(true);
+    try {
+      await fetchData();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const handleDeptSubmit = async (e) => {
     e.preventDefault();
@@ -64,7 +95,7 @@ export default function DepartmentsPage() {
       setShowDeptModal(false);
       setEditingDept(null);
       setDeptForm({ name: "", code: "", description: "" });
-      fetchData();
+      void refreshData();
     } catch (err) {
       toast.error(err?.response?.data?.message || "Failed to save department");
     }
@@ -81,7 +112,7 @@ export default function DepartmentsPage() {
       toast.success("Designation created");
       setShowDesigModal(false);
       setDesigForm({ title: "", departmentId: "", level: "mid", baseSalary: 0 });
-      fetchData();
+      void refreshData();
     } catch (err) {
       toast.error(err?.response?.data?.message || "Failed to save designation");
     }
@@ -92,7 +123,7 @@ export default function DepartmentsPage() {
     try {
       await departmentService.deleteDepartment(id);
       toast.success("Department deleted");
-      fetchData();
+      void refreshData();
     } catch (err) {
       toast.error(err?.response?.data?.message || "Failed to delete department");
     }
@@ -103,7 +134,7 @@ export default function DepartmentsPage() {
     try {
       await departmentService.deleteDesignation(id);
       toast.success("Designation deleted");
-      fetchData();
+      void refreshData();
     } catch (err) {
       toast.error(err?.response?.data?.message || "Failed to delete designation");
     }

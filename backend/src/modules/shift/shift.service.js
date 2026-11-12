@@ -71,7 +71,8 @@ export const listShiftAssignments = async ({ userId, organizationId, storeId, da
   if (storeId && date) {
     return getOrSetCache(
       `shifts:assign:${storeId}:${date}`,
-      () => populateAssignment(ShiftAssignmentModel.find(query).sort({ date: 1, createdAt: 1 })).lean(),
+      () =>
+        populateAssignment(ShiftAssignmentModel.find(query).sort({ date: 1, createdAt: 1 })).lean(),
       900, // 15 min
     );
   }

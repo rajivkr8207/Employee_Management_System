@@ -28,6 +28,7 @@ const { organizationModel } = await import('../src/modules/organization/organiza
 const { StoreModel } = await import('../src/modules/store/store.model.js');
 const { MembershipModel } = await import('../src/modules/membership/membership.model.js');
 const { EmployeeModel } = await import('../src/modules/employee/employee.model.js');
+const { ShiftModel } = await import('../src/modules/shift/shift.model.js');
 const { connectTestDB, closeTestDB, clearTestDB } = await import('./setup.js');
 
 const createUser = async ({ username, role = ROLES.STORE_ADMIN }) => {
@@ -68,6 +69,7 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
+  jest.restoreAllMocks();
   await clearTestDB();
 });
 
@@ -284,6 +286,40 @@ describe('Store API', () => {
       expect(removedManagerLogin.statusCode).toBe(403);
     });
 
+    it('compensates manager onboarding when membership persistence fails', async () => {
+      const { user: owner, token } = await createUser({
+        username: 'rollbackmanagerowner',
+      });
+      const organization = await createApprovedOrganization(
+        owner.id,
+        'rollbackmanager@example.com',
+      );
+      const store = await StoreModel.create({
+        ...storeDetails,
+        organizationId: organization.id,
+        createdBy: owner.id,
+      });
+      jest
+        .spyOn(MembershipModel, 'findOneAndUpdate')
+        .mockRejectedValueOnce(new Error('Simulated membership write failure'));
+
+      const response = await request(app)
+        .post(`/api/v1/stores/${store.id}/managers`)
+        .set('Cookie', `accessToken=${token}`)
+        .send({
+          fullName: 'Rollback Manager',
+          username: 'rollbackmanager',
+          email: 'rollbackmanager@example.com',
+          password: 'Password123',
+        });
+
+      expect(response.statusCode).toBe(500);
+      expect(await UserModel.exists({ username: 'rollbackmanager' })).toBeNull();
+      expect(await MembershipModel.countDocuments()).toBe(0);
+      expect(await EmployeeModel.countDocuments()).toBe(0);
+      expect((await StoreModel.findById(store.id)).managerId).toBeNull();
+    });
+
     it('lists, fetches, updates, and deletes the owner’s store', async () => {
       const { user, token } = await createUser({ username: 'managementowner' });
       const organization = await createApprovedOrganization(user.id, 'manageorg@example.com');
@@ -317,6 +353,58 @@ describe('Store API', () => {
         .set('Cookie', `accessToken=${token}`);
       expect(deleted.statusCode).toBe(200);
       expect(await StoreModel.exists({ _id: store.id })).toBeNull();
+    });
+
+    it('blocks deletion when inactive or terminated employee history exists', async () => {
+      const { user, token } = await createUser({ username: 'historystoreowner' });
+      const organization = await createApprovedOrganization(user.id, 'historyorg@example.com');
+      const store = await StoreModel.create({
+        ...storeDetails,
+        organizationId: organization.id,
+        createdBy: user.id,
+      });
+      await EmployeeModel.create({
+        organizationId: organization.id,
+        storeId: store.id,
+        userId: user.id,
+        employeeCode: 'HIST-EMP-001',
+        designation: 'Former Cashier',
+        salary: 25000,
+        status: 'terminated',
+      });
+
+      const deleted = await request(app)
+        .delete(`/api/v1/stores/${store.id}`)
+        .set('Cookie', `accessToken=${token}`);
+
+      expect(deleted.statusCode).toBe(409);
+      expect(await StoreModel.exists({ _id: store.id })).not.toBeNull();
+      expect(await EmployeeModel.exists({ storeId: store.id })).not.toBeNull();
+    });
+
+    it('blocks deletion when shift records reference the store', async () => {
+      const { user, token } = await createUser({ username: 'shiftstorowner' });
+      const organization = await createApprovedOrganization(user.id, 'shiftstoreorg@example.com');
+      const store = await StoreModel.create({
+        ...storeDetails,
+        organizationId: organization.id,
+        createdBy: user.id,
+      });
+      await ShiftModel.create({
+        organizationId: organization.id,
+        storeId: store.id,
+        name: 'Morning Shift',
+        startTime: '09:00',
+        endTime: '17:00',
+      });
+
+      const deleted = await request(app)
+        .delete(`/api/v1/stores/${store.id}`)
+        .set('Cookie', `accessToken=${token}`);
+
+      expect(deleted.statusCode).toBe(409);
+      expect(await StoreModel.exists({ _id: store.id })).not.toBeNull();
+      expect(await ShiftModel.exists({ storeId: store.id })).not.toBeNull();
     });
 
     it('does not expose stores owned by another administrator', async () => {

@@ -1,8 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSelector } from "react-redux";
-import { DollarSign, Play, CheckCircle2, Clock, FileText, ChevronRight } from "lucide-react";
+import { Play, FileText } from "lucide-react";
 import { toast } from "react-toastify";
 import { payrollService } from "../services/payrollService";
+
+const loadPayrollData = async (filters) => {
+  const res = await payrollService.getPayrolls(filters);
+  return res.data?.data?.payrolls || [];
+};
 
 export default function PayrollPage() {
   const { stores } = useSelector((state) => state.store || { stores: [] });
@@ -15,49 +20,80 @@ export default function PayrollPage() {
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [selectedStoreId, setSelectedStoreId] = useState(stores[0]?._id || "");
   const [payrolls, setPayrolls] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadedQuery, setLoadedQuery] = useState("");
   const [generating, setGenerating] = useState(false);
   const [viewingSlip, setViewingSlip] = useState(null);
 
-  useEffect(() => {
-    if (stores.length > 0 && !selectedStoreId) {
-      setSelectedStoreId(stores[0]._id);
-    }
-  }, [stores, selectedStoreId]);
+  const effectiveStoreId = stores.some((store) => store._id === selectedStoreId)
+    ? selectedStoreId
+    : stores[0]?._id || "";
+  const queryKey = `${organizationId}:${effectiveStoreId}:${selectedMonth}:${selectedYear}`;
+  const loading = refreshing || (Boolean(organizationId) && loadedQuery !== queryKey);
 
-  const fetchPayrolls = async () => {
+  const fetchPayrolls = useCallback(async () => {
     if (!organizationId) return;
-    setLoading(true);
     try {
-      const res = await payrollService.getPayrolls({
+      const payrollRecords = await loadPayrollData({
         organizationId,
-        storeId: selectedStoreId || undefined,
+        storeId: effectiveStoreId || undefined,
         month: selectedMonth,
         year: selectedYear,
       });
-      setPayrolls(res.data?.data?.payrolls || []);
+      setPayrolls(payrollRecords);
     } catch (err) {
       toast.error(err?.response?.data?.message || "Failed to load payroll records");
     } finally {
-      setLoading(false);
+      setLoadedQuery(queryKey);
     }
-  };
+  }, [organizationId, effectiveStoreId, selectedMonth, selectedYear, queryKey]);
 
   useEffect(() => {
-    fetchPayrolls();
-  }, [organizationId, selectedStoreId, selectedMonth, selectedYear]);
+    if (!organizationId) return undefined;
+    let active = true;
+    const loadPayrolls = async () => {
+      try {
+        const payrollRecords = await loadPayrollData({
+          organizationId,
+          storeId: effectiveStoreId || undefined,
+          month: selectedMonth,
+          year: selectedYear,
+        });
+        if (active) setPayrolls(payrollRecords);
+      } catch (err) {
+        if (active) {
+          toast.error(err?.response?.data?.message || "Failed to load payroll records");
+        }
+      } finally {
+        if (active) setLoadedQuery(queryKey);
+      }
+    };
+    void loadPayrolls();
+    return () => {
+      active = false;
+    };
+  }, [organizationId, effectiveStoreId, selectedMonth, selectedYear, queryKey]);
+
+  const refreshPayrolls = async () => {
+    setRefreshing(true);
+    try {
+      await fetchPayrolls();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const handleGeneratePayrun = async () => {
     setGenerating(true);
     try {
       await payrollService.generatePayrun({
         organizationId,
-        storeId: selectedStoreId || undefined,
+        storeId: effectiveStoreId || undefined,
         month: selectedMonth,
         year: selectedYear,
       });
       toast.success("Payrun generated successfully!");
-      fetchPayrolls();
+      await refreshPayrolls();
     } catch (err) {
       toast.error(err?.response?.data?.message || "Failed to generate payrun");
     } finally {
@@ -69,7 +105,7 @@ export default function PayrollPage() {
     try {
       await payrollService.updatePayrollStatus(id, { status });
       toast.success(`Payroll marked as ${status}`);
-      fetchPayrolls();
+      await refreshPayrolls();
     } catch (err) {
       toast.error(err?.response?.data?.message || "Failed to update status");
     }
@@ -101,7 +137,7 @@ export default function PayrollPage() {
             Store
           </label>
           <select
-            value={selectedStoreId}
+            value={effectiveStoreId}
             onChange={(e) => setSelectedStoreId(e.target.value)}
             className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
           >

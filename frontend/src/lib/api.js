@@ -5,7 +5,7 @@ const baseURL = `${Config.BACKEND_URL}/api/v1`;
 
 export const api = axios.create({
     baseURL,
-    timeout: 20000,
+    timeout: 60000,
     withCredentials: true,
     headers: { "Content-Type": "application/json" },
 });
@@ -59,7 +59,7 @@ function refreshAccessToken() {
     if (!refreshPromise) {
         refreshPromise = axios
             .post(`${baseURL}/auth/refresh-token`, {}, {
-                timeout: 10000,
+                timeout: 60000,
                 withCredentials: true,
                 headers: { "Content-Type": "application/json" },
             })

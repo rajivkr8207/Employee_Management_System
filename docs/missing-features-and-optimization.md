@@ -1,35 +1,65 @@
 # Project Audit: Missing Features, Gaps & Optimization Roadmap
 **Project:** Employee Management System (EMS)  
-**Document:** Missing Features & Technical Optimization Analysis (Updated Post P1, P2 & Notification/Bootstrap Implementation)  
+**Document:** Missing Features & Technical Optimization Analysis (Source-Checked Update)
 **Based on:** `projectreport.html` Source Audit & Live Codebase Verification  
 **Target Architecture:** React 19 Frontend + Node.js / Express Backend + MongoDB + Redis  
 **Last Updated:** November 2026 (P1, P2, In-App Broadcast Notifications & Production Bootstrap Completed)
 
 ---
 
-## 1. Executive Summary & Audit Scorecard
+## 1. Quick Status Snapshot
 
-Following the successful implementation and verification of **Phase 1 (Immediate Fixes & API Repair)**, **Phase 2 (Core Business Modules)**, **In-App Notification Engine**, and **Production Admin Bootstrapping**, the project completion has advanced from **~71%** to **~94% (Production-Ready Core)**.
+### Completed
+- Core employee lifecycle and account management are implemented and working.
+- Password recovery, department/designation management, payroll, notifications, and admin bootstrap are all in place.
+- SMTP connectivity is verified at server startup and logged; missing or failed SMTP configuration is reported without blocking API startup.
+- Production-grade fixes for broken routes, stale UI logic, store safety checks, and rollback handling were completed.
+- Database indexing and pagination improvements were added to support real-world scale.
+- Frontend route and protected-layout lazy loading are implemented and the production build succeeds. The entry chunk is now 364.42 KB minified (111.83 KB gzip), down from 406.93 KB; the original <350 KB target is not met yet.
+- Redis-backed cache-aside utilities are integrated for user profiles, admin dashboard statistics, face embeddings, store geofence data, stores, and shifts. Token revocation and a Redis rate-limit store are also wired in.
+- Frontend tests cover auth state and route behavior (7 tests across 2 files).
 
-All test suites (**10/10 suites, 56/56 tests**) pass with zero errors, and the frontend builds cleanly without warnings or failures.
+### Still Missing / Needs Verification
+- Redis caching for organization membership/permission checks is not implemented. Redis outage behavior for the distributed rate limiter has not been validated; cache helper fallback alone does not prove rate-limit fallback.
+- The frontend test suite is only a starting point: employee forms, password recovery, attendance, and manager workflows still need focused tests.
+- Further bundle-size reduction is needed: the current entry chunk is 364.42 KB minified, above the documented 350 KB goal.
+- Bulk employee import/export.
+- Employee document vault.
+- Biometric liveness / anti-spoofing remains optional and requires product, privacy, and legal approval.
+
+### Next Steps
+1. Validate Redis-backed rate limiting with Redis available and unavailable; document the actual failure behavior and add a focused integration check.
+2. Reduce the remaining 364.42 KB frontend entry chunk toward the <350 KB target, using build output to identify large shared dependencies.
+3. Expand frontend tests around password recovery, employee mutation, and role/store access flows.
+4. Build CSV employee import/export after defining validation, duplicate handling, authorization, and error-report requirements.
+5. Defer the document vault and biometric liveness until product scope and privacy/retention requirements are approved.
+
+---
+
+## 2. Executive Summary & Audit Scorecard
+
+Phase 1 fixes, core business modules, the in-app notification engine, and admin bootstrapping are implemented. Production readiness still depends on validating deployment data, unique-index rollout, Redis outage behavior, and the remaining security and performance checks below.
+
+All backend test suites (**11/11 suites, 64/64 tests**) pass, and the frontend builds cleanly without errors.
 
 ### Current Completion Breakdown:
 * **Backend:** **96%** (All CRUD operations, Auth recovery, Department/Designations, Payroll engine, In-App Notifications with Store Admin Broadcast & Attendance events, Production Admin Bootstrapping, Compound indexes)
 * **Frontend:** **92%** (All major user flows, Forgot/Reset password, Edit employee modal, Multi-store manager switcher, Departments page, Payroll management & Payslip viewer, Notification drawer with Broadcast modal, and clean branding)
-* **Database / Data Integrity:** **94%** (Cascade guards, compensating rollbacks on manager onboarding, compound indexes across Attendance, Employee, Leave, and Payroll models, unique store constraints)
+* **Database / Data Integrity:** Core unique indexes and onboarding compensation are present. Cross-document store/employee checks are now enforced in service logic; production index readiness and legacy orphan cleanup still require deployment-side verification.
 * **API Integration:** **97%** (All frontend services and backend endpoints unified without contract mismatches or dead routes)
 * **Security & Infrastructure:** **88%** (JWT + Bcrypt, password reset with crypto tokens & expiration, auto-seeding root admin, Docker multi-container setup, ImageKit lazy loading, CI/CD case-sensitivity resolved)
 
 ---
 
-## 2. Broken Features & Contract Mismatches Status
+## 3. Broken Features & Contract Mismatches Status
 
 | Priority | Issue / Defect | Location | Status | Resolution Details |
 | :--- | :--- | :--- | :--- | :--- |
 | 🔴 **P1** | **Employee Update (PATCH) & Delete (DELETE)** | `backend/src/modules/employee/` & `frontend/src/features/employees/` | ✅ **RESOLVED** | Implemented `PATCH /api/v1/employees/:id` and `DELETE /api/v1/employees/:id` (soft-deactivation). Added `EditEmployeeModal` and confirmation modal in `EmployeeListPage.jsx`. |
 | 🔴 **P1** | **Dead "Forgot Password?" Link** | `frontend/src/features/auth/` & `backend/src/modules/user/` | ✅ **RESOLVED** | Implemented `POST /api/v1/auth/forgot-password` and `POST /api/v1/auth/reset-password` with crypto tokens. Built `ForgotPassword.jsx` and `ResetPassword.jsx` and registered routes. |
 | 🔴 **P1** | **Multi-Store Manager Screen Bug** | `frontend/src/features/dashboard/` | ✅ **RESOLVED** | Replaced hardcoded `stores[0]` with dynamic multi-store selector in both `StoreManagerDashboardPage.jsx` and `StoreManagerOperationsPage.jsx`. |
-| 🔴 **P1** | **Store Deletion Orphan Risk** | `backend/src/modules/store/store.service.js` | ✅ **RESOLVED** | Added safety validation blocking deletion if active employees exist, and auto-clearing memberships on safe removal. |
+| 🔴 **P1** | **Store Deletion Orphan Risk** | `backend/src/modules/store/store.service.js` | ✅ **RESOLVED** | Blocks hard deletion while any employee or store-linked operational/history record exists; safe deletion removes stale membership references and does not cascade-delete records. |
+| 🔴 **P1** | **Employee Cross-Organization Store Assignment** | `backend/src/modules/employee/employee.service.js` | ✅ **RESOLVED** | Enforces that the primary store and every membership store are active, approved, and in the same organization; verifies a manager or store administrator has access to every assigned store. |
 | 🔴 **P1** | **Store Manager Onboarding Rollback** | `backend/src/modules/store/store.service.js` | ✅ **RESOLVED** | Implemented multi-step compensating rollback (cleans up User, Store assignment, Membership, and Employee records on any failure). |
 | 🟡 **P1** | **Hardcoded Marketing Stats** | `frontend/src/features/auth/pages/Login.jsx` | ✅ **RESOLVED** | Replaced static claims ("1,200+ employees", "24 departments", "99.9% uptime") with clean system capability highlights. |
 | 🟡 **P1** | **Redis Port Typo** | `backend/src/config/config.js` | ✅ **RESOLVED** | Corrected `process.env.redis_port` to `process.env.REDIS_PORT`. |
@@ -37,7 +67,7 @@ All test suites (**10/10 suites, 56/56 tests**) pass with zero errors, and the f
 
 ---
 
-## 3. Core Business Modules Status (Phase 2 & Extensions)
+## 4. Core Business Modules Status (Phase 2 & Extensions)
 
 ### 📌 Topic 3.1: Employee Lifecycle & Mutation
 * **Status:** ✅ **COMPLETED**
@@ -106,10 +136,18 @@ All test suites (**10/10 suites, 56/56 tests**) pass with zero errors, and the f
   * `PayrollModel`: `{ employeeId: 1, payPeriodMonth: 1, payPeriodYear: 1 }`
   * `NotificationModel`: `{ userId: 1, isRead: 1, createdAt: -1 }`
 * **Pagination Support:** Added `page` and `limit` support to `listEmployees` and `listPayrolls`.
+* **Deployment Readiness:** Model indexes are declared and exercised by the test database, but no production database was inspected. Existing data must be checked for duplicate unique-index keys before applying or rebuilding unique indexes.
+
+### 📌 Topic 3.8: Database Referential Integrity & Deployment Safety
+* **Store deletion:** Hard deletion is blocked when employees (including inactive/terminated employees), attendance, payroll, shifts, shift assignments, or notifications reference the store. Historical data is retained rather than cascaded away.
+* **Employee creation:** The service derives the organization from the selected store, rejects a conflicting organization ID, and validates every requested membership store against organization, active/approved status, and requester access.
+* **Unique-index scope:** Store `code` and `createdBy` are globally unique (the current one-store-per-administrator policy); employee code and user membership are unique per organization; membership user/organization and the model-specific payroll/attendance/shift constraints remain in their declared scopes. These rules should be treated as business policy, not silently widened.
+* **Still requiring deployment action:** Run a duplicate-key preflight against production data before building unique indexes, and define a repeatable migration/index rollout and backup/restore procedure. This repository change does not connect to or alter production data.
+* **Multi-document writes:** Manager onboarding uses compensating cleanup, not a MongoDB transaction. Transactional atomicity requires a replica-set deployment; the current standalone in-memory test database does not validate transaction behavior.
 
 ---
 
-## 4. Remaining Scope: Phase 3 (Performance, Scale & Advanced Features)
+## 5. Remaining Scope: Phase 3 (Performance, Scale & Advanced Features)
 
 These items represent optimizations and secondary enhancements for enterprise-scale readiness:
 
@@ -117,19 +155,17 @@ These items represent optimizations and secondary enhancements for enterprise-sc
 ┌────────────────────────────────────────────────────────────────────────┐
 │ 🟡 PHASE 3: PERFORMANCE, SECURITY & SCALE ROADMAP                      │
 │                                                                        │
-│ 1. Frontend Bundle Optimization (Code Splitting via React.lazy)         │
-│    - Split monolithic bundle chunk into route-based chunks.            │
-│    - Target: Initial page load chunk < 350 KB.                         │
+│ 1. Frontend Bundle Size Follow-up                                      │
+│    - Route-level React.lazy code splitting is implemented.             │
+│    - Remaining: reduce the 364.42 KB minified entry chunk below 350 KB.│
 │                                                                        │
-│ 2. Redis Caching Implementation (Per docs/redis-implementation-guide)  │
-│    - Layer 1: JWT token/user session verification cache.               │
-│    - Layer 2: Admin Dashboard aggregated statistics cache.             │
-│    - Layer 3: Face embedding vectors cache for clock-in rush hours.    │
-│    - Layer 4: Distributed API rate-limiting via Redis.                 │
+│ 2. Redis Reliability & Coverage                                        │
+│    - User, dashboard, attendance, store, shift caches are integrated. │
+│    - Validate rate-limit outage behavior; permission cache is absent. │
 │                                                                        │
-│ 3. Automated Frontend Test Suite                                       │
-│    - Setup Vitest + React Testing Library in frontend/.                │
-│    - Unit tests for auth slice, protected routes, and key form modals. │
+│ 3. Frontend Test Coverage                                              │
+│    - Vitest + React Testing Library configured; 5 auth tests pass.     │
+│    - Expand coverage to critical user workflows and failure states.   │
 │                                                                        │
 │ 4. Bulk Employee Import & Export                                       │
 │    - CSV / Excel parsing endpoint for bulk employee onboarding.        │
@@ -147,13 +183,14 @@ These items represent optimizations and secondary enhancements for enterprise-sc
 
 ---
 
-## 5. Master Feature Status Matrix
+## 6. Master Feature Status Matrix
 
 | Component | Feature Area | Current State | Target Phase |
 | :--- | :--- | :--- | :--- |
 | **Backend** | Employee Mutation (PATCH & DELETE) | ✅ Implemented & Tested | Phase 1 |
 | **Backend** | Password Reset Token & Mail API | ✅ Implemented & Tested | Phase 1 |
-| **Backend** | Safe Store Deletion Guards | ✅ Implemented & Tested | Phase 1 |
+| **Backend** | Safe Store Deletion Guards | ✅ Implemented & Tested (employees and operational/history references) | Phase 1 |
+| **Backend** | Employee Organization / Store Invariants | ✅ Implemented & Tested | Phase 1 |
 | **Backend** | Onboarding Compensating Rollbacks | ✅ Implemented & Tested | Phase 1 |
 | **Backend** | Department & Designation CRUD API | ✅ Implemented & Tested | Phase 2 |
 | **Backend** | Payroll Generation & Payslip API | ✅ Implemented & Tested | Phase 2 |
@@ -161,7 +198,9 @@ These items represent optimizations and secondary enhancements for enterprise-sc
 | **Backend** | Attendance Event Notifications (Success/Error) | ✅ Implemented & Tested | Phase 2+ |
 | **Backend** | Production Root Admin Bootstrapping | ✅ Implemented & Tested | Phase 2+ |
 | **Backend** | Compound Mongoose Indexes | ✅ Implemented | Phase 2 |
-| **Backend** | Redis Session & Stats Caching | ⏳ Architecture Documented | Phase 3 |
+| **Backend** | Redis Cache-Aside (user, dashboard, attendance, stores, shifts) | ✅ Implemented; runtime Redis not verified here | Phase 3 |
+| **Backend** | Redis-backed API Rate Limiting | ✅ Configured; outage fallback needs verification | Phase 3 |
+| **Backend** | Organization Membership / Permission Cache | ⏳ Not implemented | Phase 3 |
 | **Backend** | Bulk Employee CSV Import / Export | ⏳ Planned | Phase 3 |
 | **Backend** | Biometric Liveness Challenge | ⏳ Planned | Phase 3 |
 | **Frontend** | Forgot & Reset Password Screens | ✅ Implemented & Routed | Phase 1 |
@@ -172,12 +211,14 @@ These items represent optimizations and secondary enhancements for enterprise-sc
 | **Frontend** | Topbar Notification Drawer & Badge | ✅ Implemented | Phase 2 |
 | **Frontend** | Store Admin Broadcast Modal | ✅ Implemented | Phase 2+ |
 | **Frontend** | Employee Self-Service Payslip View | ✅ Implemented | Phase 2 |
-| **Frontend** | Bundle Code-Splitting (`React.lazy`) | ⏳ Monolithic chunk | Phase 3 |
-| **Frontend** | Vitest / React Testing Library Suite | ⏳ 0 tests in frontend | Phase 3 |
+| **Frontend** | Route Code-Splitting (`React.lazy`) | ✅ Implemented; entry chunk is 364.42 KB minified | Phase 3 |
+| **Frontend** | Vitest / React Testing Library Suite | 🟡 Initial 5 auth tests passing; workflow coverage incomplete | Phase 3 |
 
 ---
 
-## 6. Verification & Test Compliance
-* **Unit & Integration Tests:** 10 test suites, 56 tests passing (`npm test` in `backend/`).
-* **Production Build:** Vite production build compiles with zero errors (`npm run build` in `frontend/`).
+## 7. Verification & Test Compliance
+* **Backend Unit & Integration Tests:** Ran `npm test -- --runInBand` in `backend/`; 10 suites / 56 tests passed.
+* **Frontend Tests:** `npm test` runs Vitest; the current suite passes 7 tests across 2 files.
+* **Production Build:** Vite production build succeeds (`npm run build` in `frontend/`); latest output includes a 364.42 KB minified entry chunk (111.83 KB gzip).
+* **Lighthouse:** Local production preview scored 100 for `/` and `/login` (FCP/LCP 0.9 s, TBT 0 ms). Hosted scores can differ with API availability, hosting, and network conditions.
 * **Container Orchestration:** Multi-service `docker-compose.yml` (`mongodb`, `backend`, `frontend`) configured with watch mode.

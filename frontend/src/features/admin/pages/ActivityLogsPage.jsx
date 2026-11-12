@@ -211,8 +211,7 @@ export default function ActivityLogsPage() {
                                                     {detailLines.length > 0 && (
                                                         <ul className="mt-1.5 list-disc pl-4 text-xs text-[var(--danger)] opacity-80 space-y-0.5">
                                                             {detailLines.map((line, i) => (
-                                                                // eslint-disable-next-line react/no-array-index-key
-                                                                <li key={i}>{line}</li>
+                                                                <li key={`${log._id}-${i}`}>{line}</li>
                                                             ))}
                                                         </ul>
                                                     )}
