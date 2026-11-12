@@ -45,16 +45,7 @@ function StoreManagerOperationsContent({ activeSection = "employees" }) {
         dispatch(fetchMyStores());
     }, [dispatch]);
 
-    useEffect(() => {
-        if (stores?.length > 0 && (!selectedStoreId || !stores.some((s) => s._id === selectedStoreId))) {
-            setSelectedStoreId(stores[0]._id);
-        }
-    }, [stores, selectedStoreId]);
-
-    const store = useMemo(
-        () => stores.find((s) => s._id === selectedStoreId) || stores[0],
-        [stores, selectedStoreId]
-    );
+    const store = stores.find((s) => s._id === selectedStoreId) || stores[0];
     const storeId = store?._id;
     const organizationId = getId(store?.organizationId);
     const today = dayKey(new Date());

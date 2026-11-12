@@ -9,6 +9,17 @@ import { normalizeRole, ROLE_LABELS } from "../../constants/roles";
 import { notificationService } from "../../features/notifications/notificationService";
 import BroadcastNotificationModal from "../../features/notifications/BroadcastNotificationModal";
 
+const loadNotificationData = async () => {
+    const [notificationsResponse, unreadResponse] = await Promise.all([
+        notificationService.getNotifications({ limit: 15 }),
+        notificationService.getUnreadCount(),
+    ]);
+    return {
+        notifications: notificationsResponse.data?.data?.notifications || [],
+        unreadCount: unreadResponse.data?.data?.unreadCount || 0,
+    };
+};
+
 /* ── Notification Dropdown ── */
 function NotificationDropdown({
     notifications,
@@ -214,23 +225,33 @@ export default function Topbar() {
 
     const fetchNotifications = async () => {
         try {
-            const [nRes, uRes] = await Promise.all([
-                notificationService.getNotifications({ limit: 15 }),
-                notificationService.getUnreadCount(),
-            ]);
-            setNotifications(nRes.data?.data?.notifications || []);
-            setUnreadCount(uRes.data?.data?.unreadCount || 0);
-        } catch {
-            // Silently handle if notifications are not ready
+            const data = await loadNotificationData();
+            setNotifications(data.notifications);
+            setUnreadCount(data.unreadCount);
+        } catch (error) {
+            console.error("Failed to refresh notifications.", error);
         }
     };
 
     useEffect(() => {
-        if (user?._id || user?.id) {
-            fetchNotifications();
-            const interval = setInterval(fetchNotifications, 60000);
-            return () => clearInterval(interval);
-        }
+        if (!(user?._id || user?.id)) return undefined;
+        let active = true;
+        const pollNotifications = async () => {
+            try {
+                const data = await loadNotificationData();
+                if (!active) return;
+                setNotifications(data.notifications);
+                setUnreadCount(data.unreadCount);
+            } catch (error) {
+                if (active) console.error("Failed to poll notifications.", error);
+            }
+        };
+        void pollNotifications();
+        const interval = setInterval(pollNotifications, 60000);
+        return () => {
+            active = false;
+            clearInterval(interval);
+        };
     }, [user?._id, user?.id]);
 
     /* Close dropdowns on outside click */
@@ -252,7 +273,9 @@ export default function Topbar() {
             await notificationService.markAllAsRead();
             setUnreadCount(0);
             setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-        } catch {}
+        } catch (error) {
+            console.error("Failed to mark notifications as read.", error);
+        }
     };
 
     const handleNotificationClick = async (notification) => {
@@ -263,7 +286,9 @@ export default function Topbar() {
                 setNotifications((prev) =>
                     prev.map((n) => (n._id === notification._id ? { ...n, isRead: true } : n))
                 );
-            } catch {}
+            } catch (error) {
+                console.error("Failed to mark notification as read.", error);
+            }
         }
         if (notification.actionUrl) {
             setNotifOpen(false);

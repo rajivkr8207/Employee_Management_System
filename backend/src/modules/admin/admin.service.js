@@ -173,10 +173,7 @@ export const reviewManagerVerification = async (managerId, status, reason = null
   }
   await manager.save();
   // Invalidate cached user profile and dashboard stats after approval/rejection
-  await Promise.all([
-    invalidateUserCache(manager._id.toString()),
-    invalidateDashboardCache(),
-  ]);
+  await Promise.all([invalidateUserCache(manager._id.toString()), invalidateDashboardCache()]);
   const updated = (await listAdminManagers(status)).find(
     (item) => item.id === managerId.toString(),
   );
@@ -188,7 +185,6 @@ export const getAdminDashboardStats = async () => {
   return getOrSetCache('admin:dashboard:stats', _fetchAdminDashboardStats, 60);
 };
 
-// eslint-disable-next-line no-underscore-dangle
 const _fetchAdminDashboardStats = async () => {
   const [
     totalUsers,

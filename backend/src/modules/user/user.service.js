@@ -250,194 +250,194 @@ export const loginUser = async ({ identifier, password }) => {
   return { user, accessToken, refreshToken };
 };
 
-  export const logoutUser = async (id, accessToken) => {
-    const user = await User.findById(id).select('+refreshTokenHash +refreshTokenVersion');
-    if (!user) {
-      throw new ApiError(404, 'User not found');
-    }
+export const logoutUser = async (id, accessToken) => {
+  const user = await User.findById(id).select('+refreshTokenHash +refreshTokenVersion');
+  if (!user) {
+    throw new ApiError(404, 'User not found');
+  }
 
-    user.refreshTokenHash = null;
-    user.refreshTokenVersion = (user.refreshTokenVersion || 0) + 1;
-    await user.save();
+  user.refreshTokenHash = null;
+  user.refreshTokenVersion = (user.refreshTokenVersion || 0) + 1;
+  await user.save();
 
-    // ── P1.3: Blacklist the access token until its natural expiry ─────────────
-    if (accessToken) {
-      try {
-        const decoded = jwt.decode(accessToken);
-        const remaining = decoded?.exp ? decoded.exp - Math.floor(Date.now() / 1000) : 3600;
-        if (remaining > 0) {
-          await setCache(`blacklist:token:${accessToken}`, '1', remaining);
-        }
-      } catch {
-        // Ignore decoding errors — token blacklist is best-effort
+  // ── P1.3: Blacklist the access token until its natural expiry ─────────────
+  if (accessToken) {
+    try {
+      const decoded = jwt.decode(accessToken);
+      const remaining = decoded?.exp ? decoded.exp - Math.floor(Date.now() / 1000) : 3600;
+      if (remaining > 0) {
+        await setCache(`blacklist:token:${accessToken}`, '1', remaining);
       }
-    }
-
-    // ── P0.1: Evict the user profile cache immediately ───────────────────────
-    await deleteCache(`auth:user:${id}`);
-  };
-
-  export const refreshAccessToken = async (incomingRefreshToken) => {
-    if (!incomingRefreshToken) {
-      throw new ApiError(401, 'Refresh token is required');
-    }
-
-    let decoded;
-    try {
-      decoded = jwt.verify(incomingRefreshToken, Config.jwt_refresh_secret);
     } catch {
-      throw new ApiError(401, 'Invalid or expired refresh token');
+      // Ignore decoding errors — token blacklist is best-effort
     }
+  }
 
-    const user = await User.findById(decoded.id).select('+refreshTokenHash +refreshTokenVersion');
-    if (!user) {
-      throw new ApiError(404, 'User not found');
-    }
-    if (!user.isVerified || !user.isActive || user.isBlocked || !user.isApproved) {
-      throw new ApiError(403, 'Account is not active or approved');
-    }
+  // ── P0.1: Evict the user profile cache immediately ───────────────────────
+  await deleteCache(`auth:user:${id}`);
+};
 
-    if (
-      decoded.version !== user.refreshTokenVersion ||
-      !user.compareRefreshToken(incomingRefreshToken)
-    ) {
-      throw new ApiError(401, 'Refresh token revoked or invalid');
-    }
+export const refreshAccessToken = async (incomingRefreshToken) => {
+  if (!incomingRefreshToken) {
+    throw new ApiError(401, 'Refresh token is required');
+  }
 
-    user.refreshTokenVersion += 1;
-    const accessToken = user.generateAccessToken();
-    const refreshToken = user.generateRefreshToken();
-    user.setRefreshTokenHash(refreshToken);
-    await user.save();
+  let decoded;
+  try {
+    decoded = jwt.verify(incomingRefreshToken, Config.jwt_refresh_secret);
+  } catch {
+    throw new ApiError(401, 'Invalid or expired refresh token');
+  }
 
-    return { accessToken, refreshToken };
-  };
+  const user = await User.findById(decoded.id).select('+refreshTokenHash +refreshTokenVersion');
+  if (!user) {
+    throw new ApiError(404, 'User not found');
+  }
+  if (!user.isVerified || !user.isActive || user.isBlocked || !user.isApproved) {
+    throw new ApiError(403, 'Account is not active or approved');
+  }
 
-  export const getUserById = async (id) => {
-    const user = await User.findById(id);
-    if (!user) throw new ApiError(404, 'User not found');
-    return user;
-  };
+  if (
+    decoded.version !== user.refreshTokenVersion ||
+    !user.compareRefreshToken(incomingRefreshToken)
+  ) {
+    throw new ApiError(401, 'Refresh token revoked or invalid');
+  }
 
-  export const editUserProfile = async (id, { fullName, username, mobile }) => {
-    const updates = {};
-    if (fullName !== undefined) updates.fullName = fullName;
-    if (username !== undefined) updates.username = username;
-    if (mobile !== undefined) updates.mobile = mobile;
-    const user = await User.findByIdAndUpdate(
-      id,
-      { $set: updates },
-      {
-        new: true,
-        runValidators: true,
-      },
-    );
-    if (!user) throw new ApiError(404, 'User not found');
-    // Invalidate cached auth profile after any profile change
-    await deleteCache(`auth:user:${id}`);
-    return user;
-  };
+  user.refreshTokenVersion += 1;
+  const accessToken = user.generateAccessToken();
+  const refreshToken = user.generateRefreshToken();
+  user.setRefreshTokenHash(refreshToken);
+  await user.save();
 
-  export const changeUserPassword = async (id, { oldPassword, newPassword }) => {
-    const user = await User.findById(id).select('+password +refreshTokenHash +refreshTokenVersion');
-    if (!user) throw new ApiError(404, 'User not found');
+  return { accessToken, refreshToken };
+};
 
-    const isOldPasswordValid = await user.comparePassword(oldPassword);
-    if (!isOldPasswordValid) throw new ApiError(401, 'Old password is incorrect');
+export const getUserById = async (id) => {
+  const user = await User.findById(id);
+  if (!user) throw new ApiError(404, 'User not found');
+  return user;
+};
 
-    user.password = newPassword; // pre-save hook hashes it
-    user.refreshTokenHash = null;
-    user.refreshTokenVersion += 1;
-    await user.save();
-    // Invalidate cached auth profile after password change (forces re-login)
-    await deleteCache(`auth:user:${id}`);
-    return { message: 'Password changed successfully' };
-  };
+export const editUserProfile = async (id, { fullName, username, mobile }) => {
+  const updates = {};
+  if (fullName !== undefined) updates.fullName = fullName;
+  if (username !== undefined) updates.username = username;
+  if (mobile !== undefined) updates.mobile = mobile;
+  const user = await User.findByIdAndUpdate(
+    id,
+    { $set: updates },
+    {
+      new: true,
+      runValidators: true,
+    },
+  );
+  if (!user) throw new ApiError(404, 'User not found');
+  // Invalidate cached auth profile after any profile change
+  await deleteCache(`auth:user:${id}`);
+  return user;
+};
 
-  export const verifyUserByOTP = async (email, otp) => {
-    const user = await User.findOne({
-      email: email.trim().toLowerCase(),
-      otp,
-    }).select('+otp +otpExpire');
-    if (!user || !user.otpExpire || user.otpExpire <= new Date()) {
-      throw new ApiError(400, 'Invalid or expired OTP');
-    }
-    user.isVerified = true;
-    user.otp = null;
-    user.otpExpire = null;
-    await user.save();
-    return user;
-  };
+export const changeUserPassword = async (id, { oldPassword, newPassword }) => {
+  const user = await User.findById(id).select('+password +refreshTokenHash +refreshTokenVersion');
+  if (!user) throw new ApiError(404, 'User not found');
 
-  export const resendUserOtp = async (email) => {
-    const user = await User.findOne({
-      email: email.trim().toLowerCase(),
-    }).select('+otp +otpExpire');
-    if (!user) throw new ApiError(404, 'User not found');
-    if (user.isVerified) throw new ApiError(409, 'User account is already verified');
-    const otp = crypto.randomInt(100000, 1000000).toString();
-    user.otp = otp;
-    user.otpExpire = new Date(Date.now() + 10 * 60 * 1000);
-    await user.save();
-    const mail = await new MailService().SendAgainRegisterMail(email, otp, user.fullName);
-    if (!mail) {
-      throw new ApiError(500, 'Failed to send verification email');
-    }
-    return user;
-  };
+  const isOldPasswordValid = await user.comparePassword(oldPassword);
+  if (!isOldPasswordValid) throw new ApiError(401, 'Old password is incorrect');
 
-  export const requestPasswordReset = async (email) => {
-    const normalizedEmail = email?.trim().toLowerCase();
-    if (!normalizedEmail) throw new ApiError(400, 'A valid email address is required');
+  user.password = newPassword; // pre-save hook hashes it
+  user.refreshTokenHash = null;
+  user.refreshTokenVersion += 1;
+  await user.save();
+  // Invalidate cached auth profile after password change (forces re-login)
+  await deleteCache(`auth:user:${id}`);
+  return { message: 'Password changed successfully' };
+};
 
-    const user = await User.findOne({ email: normalizedEmail });
-    if (!user) {
-      return { message: 'If an account exists with this email, a reset link has been sent.' };
-    }
+export const verifyUserByOTP = async (email, otp) => {
+  const user = await User.findOne({
+    email: email.trim().toLowerCase(),
+    otp,
+  }).select('+otp +otpExpire');
+  if (!user || !user.otpExpire || user.otpExpire <= new Date()) {
+    throw new ApiError(400, 'Invalid or expired OTP');
+  }
+  user.isVerified = true;
+  user.otp = null;
+  user.otpExpire = null;
+  await user.save();
+  return user;
+};
 
-    const rawToken = crypto.randomBytes(32).toString('hex');
-    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+export const resendUserOtp = async (email) => {
+  const user = await User.findOne({
+    email: email.trim().toLowerCase(),
+  }).select('+otp +otpExpire');
+  if (!user) throw new ApiError(404, 'User not found');
+  if (user.isVerified) throw new ApiError(409, 'User account is already verified');
+  const otp = crypto.randomInt(100000, 1000000).toString();
+  user.otp = otp;
+  user.otpExpire = new Date(Date.now() + 10 * 60 * 1000);
+  await user.save();
+  const mail = await new MailService().SendAgainRegisterMail(email, otp, user.fullName);
+  if (!mail) {
+    throw new ApiError(500, 'Failed to send verification email');
+  }
+  return user;
+};
 
-    user.passwordResetToken = hashedToken;
-    user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000);
-    await user.save();
+export const requestPasswordReset = async (email) => {
+  const normalizedEmail = email?.trim().toLowerCase();
+  if (!normalizedEmail) throw new ApiError(400, 'A valid email address is required');
 
-    const frontendBase = Config.frontend_url || 'http://localhost:5173';
-    const resetUrl = `${frontendBase}/reset-password/${rawToken}`;
-
-    try {
-      await new MailService().SendPasswordResetMail(normalizedEmail, resetUrl, user.fullName);
-    } catch (err) {
-      console.error('[Password Reset Mail Error]:', err.message);
-    }
-
+  const user = await User.findOne({ email: normalizedEmail });
+  if (!user) {
     return { message: 'If an account exists with this email, a reset link has been sent.' };
-  };
+  }
 
-  export const resetPasswordWithToken = async (token, newPassword) => {
-    if (!token) throw new ApiError(400, 'Reset token is required');
-    if (!newPassword || newPassword.length < 6) {
-      throw new ApiError(400, 'Password must be at least 6 characters long');
-    }
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
 
-    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
-    const user = await User.findOne({
-      passwordResetToken: hashedToken,
-      passwordResetExpires: { $gt: new Date() },
-    }).select(
-      '+password +passwordResetToken +passwordResetExpires +refreshTokenHash +refreshTokenVersion',
-    );
+  user.passwordResetToken = hashedToken;
+  user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000);
+  await user.save();
 
-    if (!user) {
-      throw new ApiError(400, 'Reset token is invalid or has expired');
-    }
+  const frontendBase = Config.frontend_url || 'http://localhost:5173';
+  const resetUrl = `${frontendBase}/reset-password/${rawToken}`;
 
-    user.password = newPassword;
-    user.passwordResetToken = null;
-    user.passwordResetExpires = null;
-    user.refreshTokenHash = null;
-    user.refreshTokenVersion = (user.refreshTokenVersion || 0) + 1;
-    await user.save();
+  try {
+    await new MailService().SendPasswordResetMail(normalizedEmail, resetUrl, user.fullName);
+  } catch (err) {
+    console.error('[Password Reset Mail Error]:', err.message);
+  }
 
-    return { message: 'Password has been successfully reset. You can now log in.' };
-  };
+  return { message: 'If an account exists with this email, a reset link has been sent.' };
+};
+
+export const resetPasswordWithToken = async (token, newPassword) => {
+  if (!token) throw new ApiError(400, 'Reset token is required');
+  if (!newPassword || newPassword.length < 6) {
+    throw new ApiError(400, 'Password must be at least 6 characters long');
+  }
+
+  const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+  const user = await User.findOne({
+    passwordResetToken: hashedToken,
+    passwordResetExpires: { $gt: new Date() },
+  }).select(
+    '+password +passwordResetToken +passwordResetExpires +refreshTokenHash +refreshTokenVersion',
+  );
+
+  if (!user) {
+    throw new ApiError(400, 'Reset token is invalid or has expired');
+  }
+
+  user.password = newPassword;
+  user.passwordResetToken = null;
+  user.passwordResetExpires = null;
+  user.refreshTokenHash = null;
+  user.refreshTokenVersion = (user.refreshTokenVersion || 0) + 1;
+  await user.save();
+
+  return { message: 'Password has been successfully reset. You can now log in.' };
+};

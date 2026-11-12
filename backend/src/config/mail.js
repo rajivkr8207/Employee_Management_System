@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import Config from './config.js';
+import logger from './logger.js';
 
 let cachedTransporter = null;
 
@@ -11,6 +12,8 @@ export const getMailTransporter = () => {
       host: Config.smtp_host,
       port: 587,
       secure: false,
+      connectionTimeout: 30000,
+      greetingTimeout: 30000,
       auth: {
         user: Config.smtp_user,
         pass: Config.smtp_pass,
@@ -23,6 +26,22 @@ export const getMailTransporter = () => {
   }
 
   return null;
+};
+
+export const verifyMailConnection = async () => {
+  try {
+    const transporter = getMailTransporter();
+    if (!transporter) {
+      logger.warn('[Mail] SMTP is not configured; email will use simulated mode');
+      return false;
+    }
+    await transporter.verify();
+    logger.info(`[Mail] Connected to SMTP server (${Config.smtp_host})`);
+    return true;
+  } catch (error) {
+    logger.error(`[Mail] SMTP connection failed: ${error.message}`);
+    return false;
+  }
 };
 
 export default getMailTransporter;

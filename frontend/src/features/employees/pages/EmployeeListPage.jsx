@@ -261,23 +261,15 @@ function AddEmployeeModal({ open, onClose, onSubmit, loading, stores, canAddMana
 }
 
 function EditEmployeeModal({ open, employee, onClose, onSubmit, loading }) {
-  const [form, setForm] = useState({
-    designation: "",
-    salary: 0,
-    status: "active",
-    Dob: "",
+  const [form, setForm] = useState(() => {
+    const dateOfBirth = employee?.Dob || employee?.dob;
+    return {
+      designation: employee?.designation || "",
+      salary: employee?.salary != null ? employee.salary : 0,
+      status: employee?.status || "active",
+      Dob: dateOfBirth ? new Date(dateOfBirth).toISOString().slice(0, 10) : "",
+    };
   });
-
-  useEffect(() => {
-    if (employee) {
-      setForm({
-        designation: employee.designation || "",
-        salary: employee.salary != null ? employee.salary : 0,
-        status: employee.status || "active",
-        Dob: employee.Dob || employee.dob ? new Date(employee.Dob || employee.dob).toISOString().slice(0, 10) : "",
-      });
-    }
-  }, [employee]);
 
   const handleChange = (e) =>
     setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
@@ -686,13 +678,16 @@ export default function EmployeeListPage() {
         canAddManager={canAddManager}
       />
 
-      <EditEmployeeModal
-        open={Boolean(editTarget)}
-        employee={editTarget}
-        onClose={() => setEditTarget(null)}
-        onSubmit={handleEdit}
-        loading={updating}
-      />
+      {editTarget && (
+        <EditEmployeeModal
+          key={editTarget._id}
+          open
+          employee={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSubmit={handleEdit}
+          loading={updating}
+        />
+      )}
 
       {viewTarget && (
         <div

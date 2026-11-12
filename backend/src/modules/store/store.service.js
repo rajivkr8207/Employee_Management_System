@@ -5,6 +5,11 @@ import { getApprovedOrganizationForOwner } from '../organization/organization.se
 import { StoreModel } from './store.model.js';
 import { MembershipModel } from '../membership/membership.model.js';
 import { EmployeeModel } from '../employee/employee.model.js';
+import { AttendanceModel } from '../attendence/attendence.model.js';
+import { PayrollModel } from '../payroll/payroll.model.js';
+import { ShiftModel } from '../shift/shift.model.js';
+import { ShiftAssignmentModel } from '../shift/shift-assignment.model.js';
+import { NotificationModel } from '../notification/notification.model.js';
 import { MailService } from '../../services/mail.service.js';
 import Config from '../../config/config.js';
 import crypto from 'crypto';
@@ -146,14 +151,32 @@ export const deleteStore = async (storeId, storeAdminId) => {
   const store = await StoreModel.findOne(getOwnedStoreQuery(storeId, storeAdminId));
   if (!store) throw new ApiError(404, 'Store was not found');
 
-  const activeEmployeesCount = await EmployeeModel.countDocuments({
-    storeId,
-    status: 'active',
-  });
-  if (activeEmployeesCount > 0) {
+  const [
+    hasEmployees,
+    hasAttendance,
+    hasPayroll,
+    hasShifts,
+    hasShiftAssignments,
+    hasNotifications,
+  ] = await Promise.all([
+    EmployeeModel.exists({ storeId }),
+    AttendanceModel.exists({ storeId }),
+    PayrollModel.exists({ storeId }),
+    ShiftModel.exists({ storeId }),
+    ShiftAssignmentModel.exists({ storeId }),
+    NotificationModel.exists({ storeId }),
+  ]);
+  if (
+    hasEmployees ||
+    hasAttendance ||
+    hasPayroll ||
+    hasShifts ||
+    hasShiftAssignments ||
+    hasNotifications
+  ) {
     throw new ApiError(
       409,
-      `Cannot delete store with ${activeEmployeesCount} active employee(s). Please reassign or deactivate employees first.`,
+      'Cannot delete a store with employee or operational history. Archive or retain the store instead.',
     );
   }
 

@@ -51,8 +51,12 @@ function EmployeeOperationsContent({ activeSection = "attendance" }) {
     const [showLeaveForm, setShowLeaveForm] = useState(false);
     const [form, setForm] = useState({ from: "", to: "", reason: "" });
     const [myPayrolls, setMyPayrolls] = useState([]);
-    const [payrollsLoading, setPayrollsLoading] = useState(false);
+    const [loadedPayrollOrganizationId, setLoadedPayrollOrganizationId] = useState(null);
     const organizationId = getId(myEmployee?.organizationId);
+    const payrollsLoading =
+        tab === "salary" &&
+        Boolean(organizationId) &&
+        loadedPayrollOrganizationId !== organizationId;
 
     useEffect(() => {
         dispatch(fetchMyEmployee());
@@ -60,6 +64,27 @@ function EmployeeOperationsContent({ activeSection = "attendance" }) {
 
     useEffect(() => {
         if (!organizationId) return;
+        if (tab === "salary") {
+            let active = true;
+            const loadPayrolls = async () => {
+                try {
+                    const res = await payrollService.getMySalary();
+                    if (active) setMyPayrolls(res.data?.data?.payrolls || []);
+                } catch (error) {
+                    if (active) {
+                        toast.error(
+                            error?.response?.data?.message || "Failed to load salary history.",
+                        );
+                    }
+                } finally {
+                    if (active) setLoadedPayrollOrganizationId(organizationId);
+                }
+            };
+            void loadPayrolls();
+            return () => {
+                active = false;
+            };
+        }
         if (tab === "attendance") {
             const today = new Date();
             const fromDate = toDateInput(new Date(today.getFullYear(), today.getMonth(), 1));
@@ -67,13 +92,6 @@ function EmployeeOperationsContent({ activeSection = "attendance" }) {
             dispatch(fetchMyAttendanceRecords({ organizationId, fromDate, toDate }));
         }
         if (tab === "leaves") dispatch(fetchMyLeaves({ organizationId }));
-        if (tab === "salary") {
-            setPayrollsLoading(true);
-            payrollService.getMySalary()
-                .then((res) => setMyPayrolls(res.data?.data?.payrolls || []))
-                .catch(() => {})
-                .finally(() => setPayrollsLoading(false));
-        }
     }, [dispatch, organizationId, tab]);
 
     const salary = myEmployee?.salary == null

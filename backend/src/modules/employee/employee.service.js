@@ -58,29 +58,47 @@ export const createEmployee = async (employeeData, requesterId) => {
   if (!requester) throw new ApiError(401, 'User account was not found');
 
   const store = await StoreModel.findById(storeId);
-  if (!store || store.status !== 'active') {
+  if (!store || store.status !== 'active' || store.verificationStatus !== 'approved') {
     throw new ApiError(404, 'The target store was not found or is not active');
   }
 
-  if (!organizationId) {
-    organizationId = store.organizationId;
+  if (organizationId && organizationId.toString() !== store.organizationId.toString()) {
+    throw new ApiError(400, 'The selected store does not belong to this organization');
   }
+  organizationId = store.organizationId;
   if (!storeIds || !storeIds.length) {
     storeIds = [storeId];
+  }
+  const uniqueStoreIds = [...new Set(storeIds.map((id) => id.toString()))];
+  if (!uniqueStoreIds.includes(storeId.toString())) {
+    throw new ApiError(400, 'The employee store must be included in membership storeIds');
+  }
+
+  const assignmentStores = await StoreModel.find({
+    _id: { $in: uniqueStoreIds },
+    organizationId,
+    status: 'active',
+    verificationStatus: 'approved',
+  })
+    .select('_id createdBy managerId')
+    .lean();
+  if (assignmentStores.length !== uniqueStoreIds.length) {
+    throw new ApiError(400, 'All assigned stores must be active stores in this organization');
   }
 
   // Hierarchy validation:
   // - Store Admin can create manager or employee on their OWN store
   // - Store Manager can ONLY create employee on their OWN assigned store
   if (requester.role === ROLES.STORE_ADMIN) {
-    const isOwned = store.createdBy?.toString() === requesterId.toString();
-    if (!isOwned) {
-      await authorizeOrganizationAccess({
-        userId: requesterId,
-        organizationId,
-        storeId,
-        allowedRoles: ['owner', 'store_admin'],
-      });
+    for (const assignmentStore of assignmentStores) {
+      if (assignmentStore.createdBy?.toString() !== requesterId.toString()) {
+        await authorizeOrganizationAccess({
+          userId: requesterId,
+          organizationId,
+          storeId: assignmentStore._id,
+          allowedRoles: ['owner', 'store_admin'],
+        });
+      }
     }
   } else if (requester.role === ROLES.MANAGER) {
     if (role === 'manager' || role === ROLES.MANAGER) {
@@ -89,27 +107,31 @@ export const createEmployee = async (employeeData, requesterId) => {
         'Store managers cannot create other store managers. Only store administrators can appoint managers.',
       );
     }
-    const isAssigned = store.managerId?.toString() === requesterId.toString();
-    if (!isAssigned) {
-      const membership = await MembershipModel.findOne({
-        userId: requesterId,
-        storeIds: storeId,
-        role: 'manager',
-        status: 'active',
-      });
-      if (!membership) {
-        throw new ApiError(403, 'You can only add employees to your own assigned store');
-      }
+    const membership = await MembershipModel.findOne({
+      userId: requesterId,
+      organizationId,
+      role: 'manager',
+      status: 'active',
+    }).select('storeIds');
+    const assignedStoreIds = new Set([
+      ...(membership?.storeIds || []).map((id) => id.toString()),
+      ...assignmentStores
+        .filter(
+          (assignmentStore) => assignmentStore.managerId?.toString() === requesterId.toString(),
+        )
+        .map((assignmentStore) => assignmentStore._id.toString()),
+    ]);
+    if (
+      assignmentStores.some(
+        (assignmentStore) => !assignedStoreIds.has(assignmentStore._id.toString()),
+      )
+    ) {
+      throw new ApiError(403, 'You can only add employees to stores assigned to you');
     }
   } else if (requester.role === ROLES.ADMIN) {
     // Super admin permitted
   } else {
     throw new ApiError(403, 'You do not have permission to add staff to this store');
-  }
-
-  const uniqueStoreIds = [...new Set(storeIds.map((id) => id.toString()))];
-  if (!uniqueStoreIds.includes(storeId.toString())) {
-    throw new ApiError(400, 'The employee store must be included in membership storeIds');
   }
 
   let selectedUser;
