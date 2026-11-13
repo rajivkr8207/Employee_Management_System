@@ -12,16 +12,21 @@ export const getMailTransporter = () => {
       host: Config.smtp_host,
       port: 587,
       secure: false,
-      connectionTimeout: 90000,
-      greetingTimeout: 90000,
+
       auth: {
         user: Config.smtp_user,
         pass: Config.smtp_pass,
       },
+      requireTLS: true,
+      connectionTimeout: 15000,
+      greetingTimeout: 15000,
+      socketTimeout: 30000,
+
       tls: {
-        rejectUnauthorized: false,
+        minVersion: 'TLSv1.2',
       },
     });
+
     return cachedTransporter;
   }
 
