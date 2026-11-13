@@ -12,27 +12,30 @@
 ### Completed
 - Core employee lifecycle and account management are implemented and working.
 - Password recovery, department/designation management, payroll, notifications, and admin bootstrap are all in place.
+- Notifications are delivered live over authenticated Socket.IO user rooms, with REST synchronization and a disconnected-socket fallback.
 - SMTP connectivity is verified at server startup and logged; missing or failed SMTP configuration is reported without blocking API startup.
 - Production-grade fixes for broken routes, stale UI logic, store safety checks, and rollback handling were completed.
 - Database indexing and pagination improvements were added to support real-world scale.
-- Frontend route and protected-layout lazy loading are implemented and the production build succeeds. The entry chunk is now 364.42 KB minified (111.83 KB gzip), down from 406.93 KB; the original <350 KB target is not met yet.
+- Frontend route and protected-layout lazy loading are implemented and the production build succeeds. The entry chunk is now 364.41 KB minified (111.85 KB gzip), down from 406.93 KB; the original <350 KB target is not met yet.
 - Redis-backed cache-aside utilities are integrated for user profiles, admin dashboard statistics, face embeddings, store geofence data, stores, and shifts. Token revocation and a Redis rate-limit store are also wired in.
-- Frontend tests cover auth state and route behavior (7 tests across 2 files).
+- Frontend tests cover auth state, route behavior, and notification state (9 tests across 3 files).
 
 ### Still Missing / Needs Verification
 - Redis caching for organization membership/permission checks is not implemented. Redis outage behavior for the distributed rate limiter has not been validated; cache helper fallback alone does not prove rate-limit fallback.
 - The frontend test suite is only a starting point: employee forms, password recovery, attendance, and manager workflows still need focused tests.
-- Further bundle-size reduction is needed: the current entry chunk is 364.42 KB minified, above the documented 350 KB goal.
+- Socket.IO currently uses its in-memory adapter; multi-instance deployments need a shared adapter for cross-instance notification delivery.
+- Further bundle-size reduction is needed: the current entry chunk is 364.41 KB minified, above the documented 350 KB goal.
 - Bulk employee import/export.
 - Employee document vault.
 - Biometric liveness / anti-spoofing remains optional and requires product, privacy, and legal approval.
 
 ### Next Steps
 1. Validate Redis-backed rate limiting with Redis available and unavailable; document the actual failure behavior and add a focused integration check.
-2. Reduce the remaining 364.42 KB frontend entry chunk toward the <350 KB target, using build output to identify large shared dependencies.
+2. Reduce the remaining 364.41 KB frontend entry chunk toward the <350 KB target, using build output to identify large shared dependencies.
 3. Expand frontend tests around password recovery, employee mutation, and role/store access flows.
 4. Build CSV employee import/export after defining validation, duplicate handling, authorization, and error-report requirements.
 5. Defer the document vault and biometric liveness until product scope and privacy/retention requirements are approved.
+6. Add a shared Socket.IO adapter before scaling the backend across multiple instances.
 
 ---
 
@@ -40,7 +43,7 @@
 
 Phase 1 fixes, core business modules, the in-app notification engine, and admin bootstrapping are implemented. Production readiness still depends on validating deployment data, unique-index rollout, Redis outage behavior, and the remaining security and performance checks below.
 
-All backend test suites (**11/11 suites, 64/64 tests**) pass, and the frontend builds cleanly without errors.
+All backend test suites (**12/12 suites, 67/67 tests**) pass, and the frontend builds cleanly without errors.
 
 ### Current Completion Breakdown:
 * **Backend:** **96%** (All CRUD operations, Auth recovery, Department/Designations, Payroll engine, In-App Notifications with Store Admin Broadcast & Attendance events, Production Admin Bootstrapping, Compound indexes)
@@ -116,8 +119,9 @@ All backend test suites (**11/11 suites, 64/64 tests**) pass, and the frontend b
   * **Attendance Integration:**
     * Clock-in & clock-out success triggers notifications for employee and store admin/managers.
     * Clock-in & clock-out errors (geofence, shift, face mismatch) immediately dispatch alert notifications.
+  * Authenticated Socket.IO connections receive new/read events only in their server-assigned user room; JWT expiry and revoked tokens are enforced.
 * **Frontend:**
-  * Notification bell in `Topbar.jsx` with live polling, unread count badge, category tags (`announcement`, `attendance`, `alert`, `payroll`, `leave`), slide-down drawer, and action navigation.
+  * Notification bell in `Topbar.jsx` with Socket.IO delivery, unread count updates, REST synchronization, a disconnected-socket fallback, category tags, slide-down drawer, and action navigation.
   * `BroadcastNotificationModal.jsx`: Store Admin can compose announcements and select target scope (entire organization or individual store).
 
 ### 📌 Topic 3.6: Production Root Admin Bootstrapping
@@ -157,14 +161,14 @@ These items represent optimizations and secondary enhancements for enterprise-sc
 │                                                                        │
 │ 1. Frontend Bundle Size Follow-up                                      │
 │    - Route-level React.lazy code splitting is implemented.             │
-│    - Remaining: reduce the 364.42 KB minified entry chunk below 350 KB.│
+│    - Remaining: reduce the 364.41 KB minified entry chunk below 350 KB.│
 │                                                                        │
 │ 2. Redis Reliability & Coverage                                        │
 │    - User, dashboard, attendance, store, shift caches are integrated. │
 │    - Validate rate-limit outage behavior; permission cache is absent. │
 │                                                                        │
 │ 3. Frontend Test Coverage                                              │
-│    - Vitest + React Testing Library configured; 5 auth tests pass.     │
+│    - Vitest + React Testing Library configured; 9 tests pass.          │
 │    - Expand coverage to critical user workflows and failure states.   │
 │                                                                        │
 │ 4. Bulk Employee Import & Export                                       │
@@ -195,6 +199,7 @@ These items represent optimizations and secondary enhancements for enterprise-sc
 | **Backend** | Department & Designation CRUD API | ✅ Implemented & Tested | Phase 2 |
 | **Backend** | Payroll Generation & Payslip API | ✅ Implemented & Tested | Phase 2 |
 | **Backend** | In-App Notifications & Store Admin Broadcast | ✅ Implemented & Tested | Phase 2+ |
+| **Backend** | Authenticated Socket.IO Notification Delivery | ✅ Implemented; user-room scoped | Phase 2+ |
 | **Backend** | Attendance Event Notifications (Success/Error) | ✅ Implemented & Tested | Phase 2+ |
 | **Backend** | Production Root Admin Bootstrapping | ✅ Implemented & Tested | Phase 2+ |
 | **Backend** | Compound Mongoose Indexes | ✅ Implemented | Phase 2 |
@@ -208,17 +213,17 @@ These items represent optimizations and secondary enhancements for enterprise-sc
 | **Frontend** | Multi-Store Manager Switcher | ✅ Implemented | Phase 1 |
 | **Frontend** | Departments & Designations UI | ✅ Implemented & Routed | Phase 2 |
 | **Frontend** | Payroll Management & Slip View | ✅ Implemented & Routed | Phase 2 |
-| **Frontend** | Topbar Notification Drawer & Badge | ✅ Implemented | Phase 2 |
+| **Frontend** | Topbar Notification Drawer & Badge | ✅ Implemented with Socket.IO and REST fallback | Phase 2+ |
 | **Frontend** | Store Admin Broadcast Modal | ✅ Implemented | Phase 2+ |
 | **Frontend** | Employee Self-Service Payslip View | ✅ Implemented | Phase 2 |
-| **Frontend** | Route Code-Splitting (`React.lazy`) | ✅ Implemented; entry chunk is 364.42 KB minified | Phase 3 |
-| **Frontend** | Vitest / React Testing Library Suite | 🟡 Initial 5 auth tests passing; workflow coverage incomplete | Phase 3 |
+| **Frontend** | Route Code-Splitting (`React.lazy`) | ✅ Implemented; entry chunk is 364.41 KB minified | Phase 3 |
+| **Frontend** | Vitest / React Testing Library Suite | 🟡 9 tests across 3 files; workflow coverage incomplete | Phase 3 |
 
 ---
 
 ## 7. Verification & Test Compliance
-* **Backend Unit & Integration Tests:** Ran `npm test -- --runInBand` in `backend/`; 10 suites / 56 tests passed.
-* **Frontend Tests:** `npm test` runs Vitest; the current suite passes 7 tests across 2 files.
-* **Production Build:** Vite production build succeeds (`npm run build` in `frontend/`); latest output includes a 364.42 KB minified entry chunk (111.83 KB gzip).
+* **Backend Unit & Integration Tests:** Ran `npm test -- --runInBand` in `backend/`; 12 suites / 67 tests passed.
+* **Frontend Tests:** `npm test -- --run` runs Vitest; 9 tests across 3 files passed.
+* **Production Build:** Vite production build succeeds (`npm run build` in `frontend/`); latest output includes a 364.41 KB minified entry chunk (111.85 KB gzip).
 * **Lighthouse:** Local production preview scored 100 for `/` and `/login` (FCP/LCP 0.9 s, TBT 0 ms). Hosted scores can differ with API availability, hosting, and network conditions.
 * **Container Orchestration:** Multi-service `docker-compose.yml` (`mongodb`, `backend`, `frontend`) configured with watch mode.

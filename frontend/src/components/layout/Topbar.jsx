@@ -7,18 +7,8 @@ import MobileSidebar from "./MobileSidebar";
 import useAuth from "../../features/auth/hooks/useAuth";
 import { normalizeRole, ROLE_LABELS } from "../../constants/roles";
 import { notificationService } from "../../features/notifications/notificationService";
+import { useNotificationCenter } from "../../features/notifications/useNotificationCenter";
 import BroadcastNotificationModal from "../../features/notifications/BroadcastNotificationModal";
-
-const loadNotificationData = async () => {
-    const [notificationsResponse, unreadResponse] = await Promise.all([
-        notificationService.getNotifications({ limit: 15 }),
-        notificationService.getUnreadCount(),
-    ]);
-    return {
-        notifications: notificationsResponse.data?.data?.notifications || [],
-        unreadCount: unreadResponse.data?.data?.unreadCount || 0,
-    };
-};
 
 /* ── Notification Dropdown ── */
 function NotificationDropdown({
@@ -208,51 +198,25 @@ function ProfileDropdown({ user, onClose, logout }) {
 }
 
 export default function Topbar() {
-    const { user, logout } = useAuth();
+    const { user, token, logout } = useAuth();
     const navigate = useNavigate();
     const [mobileOpen, setMobileOpen] = useState(false);
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [notifOpen, setNotifOpen] = useState(false);
     const [broadcastModalOpen, setBroadcastModalOpen] = useState(false);
-    const [notifications, setNotifications] = useState([]);
-    const [unreadCount, setUnreadCount] = useState(0);
     const dropdownRef = useRef(null);
     const notifRef = useRef(null);
+    const {
+        notifications,
+        unreadCount,
+        refreshNotifications,
+        markRead,
+        markAllRead,
+    } = useNotificationCenter(user?._id || user?.id, token);
 
     const roleKey = normalizeRole(user?.role);
     const roleLabel = ROLE_LABELS[roleKey] || "User";
     const canBroadcast = user?.role === "storeadmin" || user?.role === "admin";
-
-    const fetchNotifications = async () => {
-        try {
-            const data = await loadNotificationData();
-            setNotifications(data.notifications);
-            setUnreadCount(data.unreadCount);
-        } catch (error) {
-            console.error("Failed to refresh notifications.", error);
-        }
-    };
-
-    useEffect(() => {
-        if (!(user?._id || user?.id)) return undefined;
-        let active = true;
-        const pollNotifications = async () => {
-            try {
-                const data = await loadNotificationData();
-                if (!active) return;
-                setNotifications(data.notifications);
-                setUnreadCount(data.unreadCount);
-            } catch (error) {
-                if (active) console.error("Failed to poll notifications.", error);
-            }
-        };
-        void pollNotifications();
-        const interval = setInterval(pollNotifications, 60000);
-        return () => {
-            active = false;
-            clearInterval(interval);
-        };
-    }, [user?._id, user?.id]);
 
     /* Close dropdowns on outside click */
     useEffect(() => {
@@ -271,8 +235,7 @@ export default function Topbar() {
     const handleMarkAllRead = async () => {
         try {
             await notificationService.markAllAsRead();
-            setUnreadCount(0);
-            setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+            markAllRead();
         } catch (error) {
             console.error("Failed to mark notifications as read.", error);
         }
@@ -281,11 +244,8 @@ export default function Topbar() {
     const handleNotificationClick = async (notification) => {
         if (!notification.isRead) {
             try {
-                await notificationService.markAsRead(notification._id);
-                setUnreadCount((c) => Math.max(0, c - 1));
-                setNotifications((prev) =>
-                    prev.map((n) => (n._id === notification._id ? { ...n, isRead: true } : n))
-                );
+                const response = await notificationService.markAsRead(notification._id);
+                markRead(response.data?.data?.notification || { ...notification, isRead: true });
             } catch (error) {
                 console.error("Failed to mark notification as read.", error);
             }
@@ -394,7 +354,7 @@ export default function Topbar() {
             <BroadcastNotificationModal
                 isOpen={broadcastModalOpen}
                 onClose={() => setBroadcastModalOpen(false)}
-                onSuccess={fetchNotifications}
+                onSuccess={refreshNotifications}
             />
         </>
     );
