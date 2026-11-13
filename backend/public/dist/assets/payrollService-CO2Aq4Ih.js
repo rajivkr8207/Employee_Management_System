@@ -1,1 +1,0 @@
-import{t as e}from"./api-BgwRPR_C.js";var t={getPayrolls:t=>e.get(`/payroll`,{params:t}),generatePayrun:t=>e.post(`/payroll/payrun`,t),getPayrollById:t=>e.get(`/payroll/${t}`),updatePayrollStatus:(t,n)=>e.patch(`/payroll/${t}/status`,n),getMySalary:()=>e.get(`/payroll/me`)};export{t};

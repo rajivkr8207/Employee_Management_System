@@ -23,6 +23,7 @@ const Config = {
   smtp_pass: process.env.SMTP_PASS,
 
   frontend_url: process.env.FRONTEND_URL,
+  backendUrl: process.env.BACKEND_URL,
 
   IMAGE_KIT: process.env.IMAGE_KIT,
 
