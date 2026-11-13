@@ -1,7 +1,25 @@
-import { describe, expect, it } from "vitest";
-import { notificationReducer } from "./useNotificationCenter";
+import { act, cleanup, renderHook } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+const { createSocket } = vi.hoisted(() => ({
+  createSocket: vi.fn(),
+}));
+
+vi.mock("./notificationSocket", () => ({
+  createNotificationSocket: createSocket,
+}));
+
+import {
+  notificationReducer,
+  useNotificationCenter,
+} from "./useNotificationCenter";
 
 const notification = (id, isRead = false) => ({ _id: id, isRead });
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 describe("notificationReducer", () => {
   it("deduplicates received notifications and keeps unread counts in sync", () => {
@@ -45,5 +63,34 @@ describe("notificationReducer", () => {
     const allRead = notificationReducer(oneRead, { type: "read-all" });
     expect(allRead.unreadCount).toBe(0);
     expect(allRead.notifications.every(({ isRead }) => isRead)).toBe(true);
+  });
+});
+
+describe("useNotificationCenter", () => {
+  it("loads notifications from the Socket.IO sync event", () => {
+    const handlers = {};
+    const socket = {
+      on: vi.fn((event, handler) => {
+        handlers[event] = handler;
+        return socket;
+      }),
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+    };
+    createSocket.mockReturnValue(socket);
+
+    const { result } = renderHook(() =>
+      useNotificationCenter("user-1", "token"),
+    );
+    const syncData = {
+      notifications: [notification("existing")],
+      unreadCount: 1,
+    };
+    act(() => {
+      handlers["notification:sync"](syncData);
+    });
+
+    expect(result.current).toMatchObject(syncData);
+    expect(socket.connect).toHaveBeenCalledOnce();
   });
 });

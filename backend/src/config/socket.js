@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import Config from './config.js';
 import logger from './logger.js';
 import User from '../modules/user/user.model.js';
+import { NotificationModel } from '../modules/notification/notification.model.js';
 import { getCache } from '../utils/cache.js';
 
 let socketServer;
@@ -77,6 +78,20 @@ export const initializeSocket = (httpServer) => {
   socketServer.use(authenticateSocket);
   socketServer.on('connection', (socket) => {
     socket.join(userRoom(socket.data.userId));
+
+    void Promise.all([
+      NotificationModel.find({ userId: socket.data.userId }).sort({ createdAt: -1 }).limit(15),
+      NotificationModel.countDocuments({ userId: socket.data.userId, isRead: false }),
+    ])
+      .then(([notifications, unreadCount]) => {
+        socket.emit('notification:sync', { notifications, unreadCount });
+      })
+      .catch((error) => {
+        logger.error('[Socket.IO] Failed to sync notifications', {
+          error: error.message,
+          userId: socket.data.userId,
+        });
+      });
 
     const expiresIn = Math.max(socket.data.tokenExpiresAt * 1000 - Date.now(), 0);
     const expiryTimer = setTimeout(() => socket.disconnect(true), expiresIn);

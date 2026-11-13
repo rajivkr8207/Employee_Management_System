@@ -23,11 +23,8 @@ const { app } = await import('../src/app.js');
 const Config = (await import('../src/config/config.js')).default;
 const User = (await import('../src/modules/user/user.model.js')).default;
 const { initializeSocket, closeSocketServer } = await import('../src/config/socket.js');
-const {
-  createNotification,
-  markAsRead,
-  markAllAsRead,
-} = await import('../src/modules/notification/notification.service.js');
+const { createNotification, markAsRead, markAllAsRead } =
+  await import('../src/modules/notification/notification.service.js');
 const { connectTestDB, closeTestDB, clearTestDB } = await import('./setup.js');
 
 let server;
@@ -67,15 +64,29 @@ describe('Notification Socket.IO delivery', () => {
       password: 'Password123',
       isVerified: true,
     });
+    await createNotification({
+      userId: user.id,
+      title: 'Initial notification',
+      message: 'A saved notification is ready.',
+    });
     const socket = connect({ auth: { token: user.generateAccessToken() } });
     const connected = new Promise((resolve, reject) => {
       socket.once('connect', resolve);
       socket.once('connect_error', reject);
     });
+    const initialSync = new Promise((resolve) => socket.once('notification:sync', resolve));
     const received = new Promise((resolve) => socket.once('notification:new', resolve));
 
     try {
       await connected;
+      const syncData = await initialSync;
+      expect(syncData.notifications).toHaveLength(1);
+      expect(syncData.notifications[0]).toMatchObject({
+        title: 'Initial notification',
+        userId: user.id,
+      });
+      expect(syncData.unreadCount).toBe(1);
+
       const saved = await createNotification({
         userId: user.id,
         title: 'Real-time alert',

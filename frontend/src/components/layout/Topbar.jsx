@@ -209,7 +209,6 @@ export default function Topbar() {
     const {
         notifications,
         unreadCount,
-        refreshNotifications,
         markRead,
         markAllRead,
     } = useNotificationCenter(user?._id || user?.id, token);
@@ -354,7 +353,6 @@ export default function Topbar() {
             <BroadcastNotificationModal
                 isOpen={broadcastModalOpen}
                 onClose={() => setBroadcastModalOpen(false)}
-                onSuccess={refreshNotifications}
             />
         </>
     );

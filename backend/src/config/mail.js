@@ -12,8 +12,8 @@ export const getMailTransporter = () => {
       host: Config.smtp_host,
       port: 587,
       secure: false,
-      connectionTimeout: 30000,
-      greetingTimeout: 30000,
+      connectionTimeout: 90000,
+      greetingTimeout: 90000,
       auth: {
         user: Config.smtp_user,
         pass: Config.smtp_pass,
