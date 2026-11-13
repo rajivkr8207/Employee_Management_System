@@ -6,7 +6,7 @@ import { notificationService } from "./notificationService";
 import { organizationService } from "../organization/services/organizationService";
 import { storeService } from "../store/services/storeService";
 
-export default function BroadcastNotificationModal({ isOpen, onClose, onSuccess }) {
+export default function BroadcastNotificationModal({ isOpen, onClose }) {
   const [loading, setLoading] = useState(false);
   const [initLoading, setInitLoading] = useState(true);
   const [organization, setOrganization] = useState(null);
@@ -93,7 +93,6 @@ export default function BroadcastNotificationModal({ isOpen, onClose, onSuccess 
       });
 
       setSuccess(true);
-      if (onSuccess) onSuccess();
       setTimeout(() => {
         handleClose();
       }, 1200);

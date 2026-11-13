@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useReducer } from "react";
-import { notificationService } from "./notificationService";
+import { useEffect, useReducer } from "react";
 import { createNotificationSocket } from "./notificationSocket";
 
 const initialState = { notifications: [], unreadCount: 0 };
@@ -66,17 +65,6 @@ export const notificationReducer = (state, action) => {
 export const useNotificationCenter = (userId, token) => {
   const [state, dispatch] = useReducer(notificationReducer, initialState);
 
-  const refreshNotifications = useCallback(async () => {
-    if (!userId) return;
-
-    try {
-      const data = await notificationService.loadNotificationData();
-      dispatch({ type: "sync", data });
-    } catch (error) {
-      console.error("Failed to refresh notifications.", error);
-    }
-  }, [userId]);
-
   useEffect(() => {
     if (!userId) {
       dispatch({ type: "reset" });
@@ -86,18 +74,8 @@ export const useNotificationCenter = (userId, token) => {
     let active = true;
     const socket = createNotificationSocket(token);
 
-    const loadNotifications = async () => {
-      try {
-        const data = await notificationService.loadNotificationData();
-        if (active) dispatch({ type: "sync", data });
-      } catch (error) {
-        if (active) console.error("Failed to refresh notifications.", error);
-      }
-    };
-
-    void loadNotifications();
-    socket.on("connect", () => {
-      void loadNotifications();
+    socket.on("notification:sync", (data) => {
+      if (active) dispatch({ type: "sync", data });
     });
     socket.on("notification:new", (notification) => {
       if (active) dispatch({ type: "received", notification });
@@ -110,28 +88,20 @@ export const useNotificationCenter = (userId, token) => {
     });
     socket.on("connect_error", (error) => {
       if (active) {
-        console.error(
-          "Live notifications are unavailable; REST refresh remains active.",
-          error,
-        );
+        console.error("Live notifications are unavailable.", error);
       }
     });
 
     socket.connect();
-    const fallbackInterval = setInterval(() => {
-      if (!socket.connected) void loadNotifications();
-    }, 60_000);
 
     return () => {
       active = false;
-      clearInterval(fallbackInterval);
       socket.disconnect();
     };
   }, [userId, token]);
 
   return {
     ...state,
-    refreshNotifications,
     markRead: (notification) => dispatch({ type: "updated", notification }),
     markAllRead: () => dispatch({ type: "read-all" }),
   };
