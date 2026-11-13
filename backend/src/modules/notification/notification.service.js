@@ -4,6 +4,7 @@ import { ROLES } from '../../constants/roles.js';
 import { MembershipModel } from '../membership/membership.model.js';
 import { organizationModel } from '../organization/organization.model.js';
 import { authorizeOrganizationAccess } from '../membership/membership.service.js';
+import { emitToUser } from '../../config/socket.js';
 
 export const createNotification = async ({
   userId,
@@ -12,13 +13,15 @@ export const createNotification = async ({
   type = 'info',
   actionUrl = '',
 }) => {
-  return NotificationModel.create({
+  const notification = await NotificationModel.create({
     userId,
     title,
     message,
     type,
     actionUrl,
   });
+  emitToUser(userId, 'notification:new', notification);
+  return notification;
 };
 
 export const broadcastNotification = async ({
@@ -68,7 +71,10 @@ export const broadcastNotification = async ({
   }));
 
   if (docs.length > 0) {
-    await NotificationModel.insertMany(docs);
+    const notifications = await NotificationModel.insertMany(docs);
+    notifications.forEach((notification) => {
+      emitToUser(notification.userId, 'notification:new', notification);
+    });
   }
 
   return { count: docs.length };
@@ -109,7 +115,10 @@ export const notifyStoreAdminsOnAttendance = async ({
     }));
 
     if (docs.length > 0) {
-      await NotificationModel.insertMany(docs);
+      const notifications = await NotificationModel.insertMany(docs);
+      notifications.forEach((notification) => {
+        emitToUser(notification.userId, 'notification:new', notification);
+      });
     }
   } catch {
     // Non-blocking notification dispatch
@@ -126,16 +135,26 @@ export const getUserNotifications = async (userId, { isRead, limit = 20 } = {}) 
 
 export const markAsRead = async (notificationId, userId) => {
   const notification = await NotificationModel.findOneAndUpdate(
-    { _id: notificationId, userId },
+    { _id: notificationId, userId, isRead: false },
     { $set: { isRead: true } },
     { new: true },
   );
-  if (!notification) throw new ApiError(404, 'Notification not found');
-  return notification;
+  if (notification) {
+    emitToUser(userId, 'notification:updated', notification);
+    return notification;
+  }
+
+  const existingNotification = await NotificationModel.findOne({ _id: notificationId, userId });
+  if (!existingNotification) throw new ApiError(404, 'Notification not found');
+  return existingNotification;
 };
 
 export const markAllAsRead = async (userId) => {
-  await NotificationModel.updateMany({ userId, isRead: false }, { $set: { isRead: true } });
+  const result = await NotificationModel.updateMany(
+    { userId, isRead: false },
+    { $set: { isRead: true } },
+  );
+  if (result.modifiedCount > 0) emitToUser(userId, 'notification:read-all');
   return { message: 'All notifications marked as read' };
 };
 
