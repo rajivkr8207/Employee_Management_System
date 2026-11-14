@@ -10,6 +10,7 @@ import {
   VerifyUserByOTPController,
   ResendUserOtpController,
   inviteStoreAdmin,
+  getStoreAdminInvitations,
   verifyStoreAdminInvitationToken,
   registerInvitedStoreAdmin,
   getPendingStoreAdmins,
@@ -45,14 +46,14 @@ const authRouter = Router();
 
 /**
  * @route   POST /api/v1/auth/register
- * @desc    Register an employee account and send an email OTP
+ * @desc    Register an employee account
  * @access  Public
  */
 authRouter.post('/register', receiveImage, registerValidation, register);
 
 /**
  * @route   POST /api/v1/auth/verify-otp
- * @desc    Verify user email using OTP
+ * @desc    Verify user account using OTP
  * @access  Public
  */
 authRouter.post('/verify-otp', verifyOtpValidation, VerifyUserByOTPController);
@@ -125,8 +126,14 @@ authRouter.patch('/change-password', verifyJWT, changePasswordValidation, change
 /**
  * POST /api/v1/auth/store-admin/invitations
  * Body: { "email": "store@example.com" }
- * Sends a one-use registration link that expires after 24 hours.
+ * Generates and stores a one-use registration link that expires after 24 hours.
  */
+authRouter.get(
+  '/store-admin/invitations',
+  verifyJWT,
+  verifyAdmin,
+  getStoreAdminInvitations,
+);
 authRouter.post(
   '/store-admin/invitations',
   verifyJWT,

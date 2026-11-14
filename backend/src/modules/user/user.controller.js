@@ -11,6 +11,7 @@ import {
   verifyUserByOTP,
   resendUserOtp,
   createStoreAdminInvitation,
+  listStoreAdminInvitations,
   verifyStoreAdminInvitation,
   registerStoreAdmin,
   listPendingStoreAdmins,
@@ -69,7 +70,14 @@ export const inviteStoreAdmin = asyncHandler(async (req, res) => {
   const invitation = await createStoreAdminInvitation(req.body.email, req.user.id);
   return res
     .status(201)
-    .json(new ApiResponse(201, invitation, 'Store administrator invitation sent'));
+    .json(new ApiResponse(201, invitation, 'Store administrator invitation link generated'));
+});
+
+export const getStoreAdminInvitations = asyncHandler(async (_req, res) => {
+  const invitations = await listStoreAdminInvitations();
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { invitations }, 'Store administrator invitations fetched'));
 });
 
 export const registerInvitedStoreAdmin = asyncHandler(async (req, res) => {

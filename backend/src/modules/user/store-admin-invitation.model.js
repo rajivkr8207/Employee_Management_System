@@ -15,12 +15,21 @@ const storeAdminInvitationSchema = new mongoose.Schema(
       unique: true,
       select: false,
     },
+    invitationLink: {
+      type: String,
+      required: true,
+      select: false,
+    },
     expiresAt: {
       type: Date,
       required: true,
       index: true,
     },
     usedAt: {
+      type: Date,
+      default: null,
+    },
+    revokedAt: {
       type: Date,
       default: null,
     },

@@ -37,6 +37,8 @@ const { app } = await import('../src/app.js');
 const { default: UserModel } = await import('../src/modules/user/user.model.js');
 const { default: StoreAdminInvitation } =
   await import('../src/modules/user/store-admin-invitation.model.js');
+const { createStoreAdminInvitation, listStoreAdminInvitations } =
+  await import('../src/modules/user/user.service.js');
 const { connectTestDB, closeTestDB, clearTestDB } = await import('./setup.js');
 
 beforeAll(async () => {
@@ -59,6 +61,49 @@ describe('Auth API', () => {
     password: 'Password123',
   };
 
+  describe('Store administrator invitations', () => {
+    it('persists generated links and lists recipients while revoking older links', async () => {
+      const inviter = await UserModel.create({
+        ...validUser,
+        username: 'inviteadmin',
+        email: 'invite-admin@example.com',
+        role: 'admin',
+        isVerified: true,
+        isApproved: true,
+      });
+
+      const firstInvite = await createStoreAdminInvitation('StoreAdmin@example.com', inviter.id);
+      expect(firstInvite.email).toBe('storeadmin@example.com');
+      expect(firstInvite.invitationLink).toContain('/register?token=');
+
+      const savedInvitation = await StoreAdminInvitation.findById(firstInvite._id).select(
+        '+invitationLink +tokenHash',
+      );
+      expect(savedInvitation.invitationLink).toBe(firstInvite.invitationLink);
+      expect(firstInvite.invitationLink).not.toContain(savedInvitation.tokenHash);
+
+      const secondInvite = await createStoreAdminInvitation('storeadmin@example.com', inviter.id);
+      const invitations = await listStoreAdminInvitations();
+      const firstListed = invitations.find(({ _id }) => _id.toString() === firstInvite._id.toString());
+      const secondListed = invitations.find(({ _id }) => _id.toString() === secondInvite._id.toString());
+
+      expect(firstListed.status).toBe('revoked');
+      expect(firstListed.invitationLink).toBeUndefined();
+      expect(secondListed).toMatchObject({
+        email: 'storeadmin@example.com',
+        status: 'active',
+        invitationLink: secondInvite.invitationLink,
+      });
+      expect(secondListed.invitedBy.email).toBe(inviter.email);
+
+      const response = await request(app)
+        .get('/api/v1/auth/store-admin/invitations')
+        .set('Authorization', `Bearer ${inviter.generateAccessToken()}`);
+      expect(response.statusCode).toBe(200);
+      expect(response.body.data.invitations).toHaveLength(2);
+    });
+  });
+
   describe('POST /api/v1/auth/register', () => {
     it('should reject direct registration without an invitation', async () => {
       const res = await request(app).post('/api/v1/auth/register').send(validUser);
@@ -78,6 +123,7 @@ describe('Auth API', () => {
       await StoreAdminInvitation.create({
         email: 'invited-admin@example.com',
         tokenHash: crypto.createHash('sha256').update(token).digest('hex'),
+        invitationLink: `http://localhost:5173/register?token=${token}`,
         expiresAt: new Date(Date.now() + 60_000),
         invitedBy: inviter.id,
       });

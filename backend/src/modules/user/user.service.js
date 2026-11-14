@@ -2,7 +2,6 @@ import User from './user.model.js';
 import { ApiError } from '../../utils/ApiError.js';
 import jwt from 'jsonwebtoken';
 import Config from '../../config/config.js';
-import { MailService } from '../../services/mail.service.js';
 import StoreAdminInvitation from './store-admin-invitation.model.js';
 import crypto from 'crypto';
 import { URL } from 'node:url';
@@ -50,38 +49,62 @@ export const createStoreAdminInvitation = async (email, invitedBy) => {
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
+  const frontendBase = Config.frontend_url || 'http://localhost:5173';
+  const invitationUrl = new URL('/register', frontendBase);
+  invitationUrl.searchParams.set('token', token);
+  const invitationLink = invitationUrl.toString();
   const invitation = await StoreAdminInvitation.create({
     email: normalizedEmail,
     tokenHash,
+    invitationLink,
     expiresAt,
     invitedBy,
   });
 
-  const frontendBase = Config.frontend_url || 'http://localhost:5173';
-  const invitationUrl = new URL('/register', frontendBase);
-  invitationUrl.searchParams.set('token', token);
-
-  let mailResult = { success: true };
-  try {
-    mailResult = await new MailService().SendStoreAdminInvitation(
-      normalizedEmail,
-      invitationUrl.toString(),
-    );
-  } catch (error) {
-    console.error('[Invitation Mail Failed]:', error.message);
-  }
-
   await StoreAdminInvitation.updateMany(
-    { email: normalizedEmail, _id: { $ne: invitation._id }, usedAt: null },
-    { $set: { usedAt: new Date() } },
+    {
+      email: normalizedEmail,
+      _id: { $ne: invitation._id },
+      usedAt: null,
+      revokedAt: null,
+    },
+    { $set: { revokedAt: new Date() } },
   );
 
   return {
+    _id: invitation._id,
     email: normalizedEmail,
+    createdAt: invitation.createdAt,
     expiresAt,
-    invitationLink: invitationUrl.toString(),
-    mailSent: mailResult.success,
+    invitationLink,
+    status: 'active',
   };
+};
+
+export const listStoreAdminInvitations = async () => {
+  const now = new Date();
+  const invitations = await StoreAdminInvitation.find()
+    .select('+invitationLink email expiresAt usedAt revokedAt createdAt invitedBy')
+    .populate('invitedBy', 'fullName email')
+    .sort({ createdAt: -1 })
+    .lean();
+
+  return invitations.map((invitation) => {
+    let status = 'active';
+    if (invitation.usedAt) status = 'used';
+    else if (invitation.revokedAt) status = 'revoked';
+    else if (invitation.expiresAt <= now) status = 'expired';
+
+    return {
+      _id: invitation._id,
+      email: invitation.email,
+      createdAt: invitation.createdAt,
+      expiresAt: invitation.expiresAt,
+      status,
+      invitedBy: invitation.invitedBy,
+      ...(status === 'active' ? { invitationLink: invitation.invitationLink } : {}),
+    };
+  });
 };
 
 export const verifyStoreAdminInvitation = async (token) => {
@@ -90,6 +113,7 @@ export const verifyStoreAdminInvitation = async (token) => {
     tokenHash,
     expiresAt: { $gt: new Date() },
     usedAt: null,
+    revokedAt: null,
   }).select('email expiresAt');
 
   if (!invitation) {
@@ -117,6 +141,7 @@ export const registerStoreAdmin = async ({
     tokenHash,
     expiresAt: { $gt: new Date() },
     usedAt: null,
+    revokedAt: null,
   }).select('+tokenHash email');
 
   if (!invitation) {
@@ -179,16 +204,6 @@ export const approveStoreAdmin = async (id) => {
     throw new ApiError(404, 'Pending store administrator was not found');
   }
 
-  try {
-    await new MailService().SendAccountApprovedMail(
-      user.email,
-      user.fullName,
-      'Store Administrator',
-    );
-  } catch (err) {
-    console.error('[Approval Mail Error]:', err.message);
-  }
-
   return { user };
 };
 
@@ -223,12 +238,7 @@ export const loginUser = async ({ identifier, password }) => {
     throw new ApiError(404, 'User not found');
   }
   if (!user.isVerified) {
-    if (!Config.smtp_host) {
-      user.isVerified = true;
-      await user.save();
-    } else {
-      throw new ApiError(403, 'Account is not verified. Please verify your email.');
-    }
+    throw new ApiError(403, 'Account is not verified. Please contact an administrator.');
   }
   if (!user.isActive) {
     throw new ApiError(403, 'Account is not active. Please contact support.');
@@ -370,48 +380,15 @@ export const verifyUserByOTP = async (email, otp) => {
 };
 
 export const resendUserOtp = async (email) => {
-  const user = await User.findOne({
-    email: email.trim().toLowerCase(),
-  }).select('+otp +otpExpire');
-  if (!user) throw new ApiError(404, 'User not found');
-  if (user.isVerified) throw new ApiError(409, 'User account is already verified');
-  const otp = crypto.randomInt(100000, 1000000).toString();
-  user.otp = otp;
-  user.otpExpire = new Date(Date.now() + 10 * 60 * 1000);
-  await user.save();
-  const mail = await new MailService().SendAgainRegisterMail(email, otp, user.fullName);
-  if (!mail) {
-    throw new ApiError(500, 'Failed to send verification email');
-  }
-  return user;
+  if (!email?.trim()) throw new ApiError(400, 'A valid email address is required');
+  throw new ApiError(503, 'Email delivery is disabled; OTP cannot be sent.');
 };
 
 export const requestPasswordReset = async (email) => {
   const normalizedEmail = email?.trim().toLowerCase();
   if (!normalizedEmail) throw new ApiError(400, 'A valid email address is required');
 
-  const user = await User.findOne({ email: normalizedEmail });
-  if (!user) {
-    return { message: 'If an account exists with this email, a reset link has been sent.' };
-  }
-
-  const rawToken = crypto.randomBytes(32).toString('hex');
-  const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
-
-  user.passwordResetToken = hashedToken;
-  user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000);
-  await user.save();
-
-  const frontendBase = Config.frontend_url || 'http://localhost:5173';
-  const resetUrl = `${frontendBase}/reset-password/${rawToken}`;
-
-  try {
-    await new MailService().SendPasswordResetMail(normalizedEmail, resetUrl, user.fullName);
-  } catch (err) {
-    console.error('[Password Reset Mail Error]:', err.message);
-  }
-
-  return { message: 'If an account exists with this email, a reset link has been sent.' };
+  throw new ApiError(503, 'Email delivery is disabled; password reset link cannot be sent.');
 };
 
 export const resetPasswordWithToken = async (token, newPassword) => {
