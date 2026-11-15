@@ -8,6 +8,8 @@ import { URL } from 'node:url';
 import { ROLES } from '../../constants/roles.js';
 import { createFaceProfileData } from './face.service.js';
 import { deleteCache, setCache } from '../../utils/cache.js';
+import logger from '../../config/logger.js';
+import { UploadImageToImageKit } from '../../services/image.service.js';
 
 export const registerUser = async (registrationData) => {
   const { token, fullName, username, password, mobile, avatarBuffer, avatarMimeType } =
@@ -155,9 +157,19 @@ export const registerStoreAdmin = async ({
     throw new ApiError(409, 'User with this email, username, or mobile already exists');
   }
 
-  const faceProfile = avatarBuffer
-    ? await createFaceProfileData({ imageBuffer: avatarBuffer, contentType: avatarMimeType })
-    : {};
+  let faceProfile = { avatar: null };
+  if (avatarBuffer) {
+    try {
+      faceProfile = await createFaceProfileData({
+        imageBuffer: avatarBuffer,
+        contentType: avatarMimeType,
+      });
+    } catch (error) {
+      logger.warn('Registration image processing failed; continuing without an avatar', {
+        message: error.message,
+      });
+    }
+  }
   const user = await User.create({
     fullName,
     username,
@@ -329,11 +341,27 @@ export const getUserById = async (id) => {
   return user;
 };
 
-export const editUserProfile = async (id, { fullName, username, mobile }) => {
+export const editUserProfile = async (
+  id,
+  { fullName, username, mobile, avatarBuffer, avatarMimeType },
+) => {
   const updates = {};
   if (fullName !== undefined) updates.fullName = fullName;
   if (username !== undefined) updates.username = username;
   if (mobile !== undefined) updates.mobile = mobile;
+  if (avatarBuffer) {
+    const extension = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[
+      avatarMimeType
+    ];
+    const upload = await UploadImageToImageKit({
+      buffer: avatarBuffer,
+      fileName: `avatar-${crypto.randomBytes(12).toString('hex')}.${extension}`,
+      folderPath: 'employee-avatars',
+    });
+    console.log('ImageKit upload result:', upload);
+    if (!upload?.url) throw new ApiError(502, 'Image service did not return an image URL');
+    updates.avatar = upload.url;
+  }
   const user = await User.findByIdAndUpdate(
     id,
     { $set: updates },

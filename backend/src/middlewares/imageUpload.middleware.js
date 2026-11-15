@@ -1,5 +1,6 @@
 import multer from 'multer';
 import { ApiError } from '../utils/ApiError.js';
+import logger from '../config/logger.js';
 
 const imageUpload = multer({
   storage: multer.memoryStorage(),
@@ -16,9 +17,22 @@ const imageUpload = multer({
   },
 });
 
-export const receiveImage = (req, res, next) => {
+const receiveImageWithOptions = (optional) => (req, res, next) => {
   imageUpload.single('image')(req, res, (error) => {
     if (!error) {
+      next();
+      return;
+    }
+    if (
+      optional &&
+      (error instanceof multer.MulterError ||
+        (error instanceof ApiError && error.message === 'Upload a JPEG, PNG, or WebP image'))
+    ) {
+      logger.warn('Optional image upload was skipped', {
+        path: req.originalUrl,
+        message: error.message,
+      });
+      req.file = undefined;
       next();
       return;
     }
@@ -32,3 +46,6 @@ export const receiveImage = (req, res, next) => {
     next(error);
   });
 };
+
+export const receiveImage = receiveImageWithOptions(false);
+export const receiveOptionalImage = receiveImageWithOptions(true);

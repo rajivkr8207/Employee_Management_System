@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { User, Mail, Briefcase, Phone, MapPin, Calendar, Camera, LogOut, Shield, Check, KeyRound } from "lucide-react";
 import useAuth from "../hooks/useAuth";
 import Card from "../../../components/ui/Card";
@@ -74,6 +74,8 @@ export default function Profile() {
         position: user?.position || "",
     });
     const [successMsg, setSuccessMsg] = useState("");
+    const [avatarError, setAvatarError] = useState("");
+    const avatarInputRef = useRef(null);
     const [passwordForm, setPasswordForm] = useState({
         oldPassword: "",
         newPassword: "",
@@ -112,6 +114,29 @@ export default function Profile() {
             setSuccessMsg("Profile updated successfully!");
             setTab("overview");
             setTimeout(() => setSuccessMsg(""), 3500);
+        }
+    };
+
+    const handleAvatarChange = async (event) => {
+        const file = event.target.files?.[0];
+        event.target.value = "";
+        if (!file) return;
+
+        if (
+            !["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
+            file.size > 5 * 1024 * 1024
+        ) {
+            setAvatarError("Choose a JPEG, PNG, or WebP image up to 5 MB.");
+            return;
+        }
+
+        setAvatarError("");
+        const result = await updateProfile({ avatar: file });
+        if (result?.success) {
+            setSuccessMsg("Profile photo updated successfully.");
+            setTimeout(() => setSuccessMsg(""), 3500);
+        } else {
+            setAvatarError(result?.error || "Profile photo upload failed. Please try again.");
         }
     };
 
@@ -177,14 +202,31 @@ export default function Profile() {
                             {/* Avatar */}
                             <div className="relative mb-4">
                                 <Avatar user={user} size="lg" />
+                                <input
+                                    ref={avatarInputRef}
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp"
+                                    capture="user"
+                                    onChange={handleAvatarChange}
+                                    className="hidden"
+                                    aria-label="Choose a profile photo"
+                                />
                                 <button
                                     type="button"
-                                    className="absolute bottom-0 right-0 flex items-center justify-center w-7 h-7 rounded-full bg-[var(--primary)] text-white shadow-md hover:opacity-90 transition-opacity"
-                                    title="Change photo"
+                                    onClick={() => avatarInputRef.current?.click()}
+                                    disabled={updateLoading}
+                                    className="absolute bottom-0 right-0 flex items-center justify-center w-7 h-7 rounded-full bg-[var(--primary)] text-white shadow-md hover:opacity-90 transition-opacity disabled:opacity-60"
+                                    title={updateLoading ? "Uploading photo..." : "Change photo"}
+                                    aria-label={updateLoading ? "Uploading profile photo" : "Change profile photo"}
                                 >
                                     <Camera size={13} />
                                 </button>
                             </div>
+                            {avatarError && (
+                                <p role="alert" className="mb-3 text-xs text-[var(--danger)]">
+                                    {avatarError}
+                                </p>
+                            )}
 
                             <h2 className="text-base font-bold text-[var(--text-primary)] mb-1">
                                 {user?.fullName || user?.name || user?.username || "—"}

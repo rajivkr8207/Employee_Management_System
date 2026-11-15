@@ -39,13 +39,10 @@ export const registerThunk = createAsyncThunk(
                 });
                 body.append("image", payload.avatar);
             }
-            const { data } = await api.post(
-                endpoint,
-                body,
-                body instanceof FormData
-                    ? { headers: { "Content-Type": "multipart/form-data" } }
-                    : undefined
-            );
+            const config = body instanceof FormData
+                ? { headers: { "Content-Type": "multipart/form-data" } }
+                : undefined;
+            const { data } = await api.post(endpoint, body, config);
             return data?.data || data;
         } catch (err) {
             return rejectWithValue(extractError(err));
@@ -83,7 +80,16 @@ export const updateProfileThunk = createAsyncThunk(
                 ...(formData.username ? { username: formData.username } : {}),
                 ...(formData.mobile || formData.phone ? { mobile: formData.mobile || formData.phone } : {}),
             };
-            const { data } = await api.patch("/auth/profile", payload);
+            let body = payload;
+            if (formData.avatar) {
+                body = new FormData();
+                Object.entries(payload).forEach(([key, value]) => body.append(key, value));
+                body.append("image", formData.avatar);
+            }
+            const config = body instanceof FormData
+                ? { headers: { "Content-Type": "multipart/form-data" } }
+                : undefined;
+            const { data } = await api.patch("/auth/profile", body, config);
             return data?.data || data;
         } catch (err) {
             return rejectWithValue(extractError(err));

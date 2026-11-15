@@ -21,7 +21,10 @@ import {
   resetPassword,
 } from './user.controller.js';
 import { verifyAdmin, verifyJWT } from '../../middlewares/auth.middleware.js';
-import { receiveImage } from '../../middlewares/imageUpload.middleware.js';
+import {
+  receiveImage,
+  receiveOptionalImage,
+} from '../../middlewares/imageUpload.middleware.js';
 import {
   loginValidation,
   registerValidation,
@@ -49,7 +52,7 @@ const authRouter = Router();
  * @desc    Register an employee account
  * @access  Public
  */
-authRouter.post('/register', receiveImage, registerValidation, register);
+authRouter.post('/register', receiveOptionalImage, registerValidation, register);
 
 /**
  * @route   POST /api/v1/auth/verify-otp
@@ -66,7 +69,7 @@ authRouter.get(
 );
 authRouter.post(
   '/store-admin/register',
-  receiveImage,
+  receiveOptionalImage,
   invitedStoreAdminRegisterValidation,
   registerInvitedStoreAdmin,
 );
@@ -111,7 +114,7 @@ authRouter.post('/face/enroll', verifyJWT, receiveImage, enrollFace);
  * @desc    Edit current user's profile (fullName, username)
  * @access  Protected
  */
-authRouter.patch('/profile', verifyJWT, editProfileValidation, editProfile);
+authRouter.patch('/profile', verifyJWT, receiveImage, editProfileValidation, editProfile);
 
 /**
  * @route   PATCH /api/v1/auth/change-password
