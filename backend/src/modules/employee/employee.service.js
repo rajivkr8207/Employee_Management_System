@@ -193,24 +193,6 @@ export const createEmployee = async (employeeData, requesterId) => {
     throw mapDuplicateKeyError(error);
   }
 
-  // Send onboarding credentials email
-  if (createdUser && user?.password) {
-    try {
-      const Config = (await import('../../config/config.js')).default;
-      const { MailService } = await import('../../services/mail.service.js');
-      await new MailService().SendStaffCredentialsMail(
-        selectedUser.email,
-        selectedUser.fullName,
-        role === 'manager' ? 'Store Manager' : 'Employee',
-        store.name,
-        user.password,
-        `${Config.frontend_url || 'http://localhost:5173'}/login`,
-      );
-    } catch (err) {
-      console.error('[Staff Credentials Mail Error]:', err.message);
-    }
-  }
-
   return populateEmployee(EmployeeModel.findById(createdEmployee._id));
 };
 

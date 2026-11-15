@@ -11,6 +11,7 @@ import {
   verifyUserByOTP,
   resendUserOtp,
   createStoreAdminInvitation,
+  listStoreAdminInvitations,
   verifyStoreAdminInvitation,
   registerStoreAdmin,
   listPendingStoreAdmins,
@@ -21,6 +22,7 @@ import {
 } from './user.service.js';
 import { enrollUserFace } from './face.service.js';
 import { deleteCache } from '../../utils/cache.js';
+import { ApiError } from '../../utils/ApiError.js';
 
 const cookieOptions = {
   httpOnly: true,
@@ -69,7 +71,14 @@ export const inviteStoreAdmin = asyncHandler(async (req, res) => {
   const invitation = await createStoreAdminInvitation(req.body.email, req.user.id);
   return res
     .status(201)
-    .json(new ApiResponse(201, invitation, 'Store administrator invitation sent'));
+    .json(new ApiResponse(201, invitation, 'Store administrator invitation link generated'));
+});
+
+export const getStoreAdminInvitations = asyncHandler(async (_req, res) => {
+  const invitations = await listStoreAdminInvitations();
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { invitations }, 'Store administrator invitations fetched'));
 });
 
 export const registerInvitedStoreAdmin = asyncHandler(async (req, res) => {
@@ -187,9 +196,18 @@ export const getProfile = asyncHandler(async (req, res) => {
 // PATCH /api/v1/auth/profile  [Protected]
 // ─────────────────────────────────────────────
 export const editProfile = asyncHandler(async (req, res) => {
+  if (Object.prototype.hasOwnProperty.call(req.body, 'image') && !req.file) {
+    throw new ApiError(400, 'Profile image upload was not received');
+  }
   const { fullName, username, mobile } = req.body;
 
-  const user = await editUserProfile(req.user.id, { fullName, username, mobile });
+  const user = await editUserProfile(req.user.id, {
+    fullName,
+    username,
+    mobile,
+    avatarBuffer: req.file?.buffer,
+    avatarMimeType: req.file?.mimetype,
+  });
 
   return res.status(200).json(new ApiResponse(200, user, 'Profile updated successfully'));
 });

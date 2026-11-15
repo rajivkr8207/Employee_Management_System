@@ -24,8 +24,12 @@ jest.unstable_mockModule('../src/services/mail.service.js', () => ({
   },
 }));
 
+const uploadImageToImageKit = jest.fn(async () => ({
+  url: 'https://ik.imagekit.io/test/enrolled-face.jpg',
+}));
+
 jest.unstable_mockModule('../src/services/image.service.js', () => ({
-  UploadImageToImageKit: async () => ({ url: 'https://ik.imagekit.io/test/enrolled-face.jpg' }),
+  UploadImageToImageKit: (...args) => uploadImageToImageKit(...args),
 }));
 
 jest.unstable_mockModule('../src/services/faceRecognition.service.js', () => ({
@@ -37,6 +41,8 @@ const { app } = await import('../src/app.js');
 const { default: UserModel } = await import('../src/modules/user/user.model.js');
 const { default: StoreAdminInvitation } =
   await import('../src/modules/user/store-admin-invitation.model.js');
+const { createStoreAdminInvitation, listStoreAdminInvitations } =
+  await import('../src/modules/user/user.service.js');
 const { connectTestDB, closeTestDB, clearTestDB } = await import('./setup.js');
 
 beforeAll(async () => {
@@ -59,6 +65,49 @@ describe('Auth API', () => {
     password: 'Password123',
   };
 
+  describe('Store administrator invitations', () => {
+    it('persists generated links and lists recipients while revoking older links', async () => {
+      const inviter = await UserModel.create({
+        ...validUser,
+        username: 'inviteadmin',
+        email: 'invite-admin@example.com',
+        role: 'admin',
+        isVerified: true,
+        isApproved: true,
+      });
+
+      const firstInvite = await createStoreAdminInvitation('StoreAdmin@example.com', inviter.id);
+      expect(firstInvite.email).toBe('storeadmin@example.com');
+      expect(firstInvite.invitationLink).toContain('/register?token=');
+
+      const savedInvitation = await StoreAdminInvitation.findById(firstInvite._id).select(
+        '+invitationLink +tokenHash',
+      );
+      expect(savedInvitation.invitationLink).toBe(firstInvite.invitationLink);
+      expect(firstInvite.invitationLink).not.toContain(savedInvitation.tokenHash);
+
+      const secondInvite = await createStoreAdminInvitation('storeadmin@example.com', inviter.id);
+      const invitations = await listStoreAdminInvitations();
+      const firstListed = invitations.find(({ _id }) => _id.toString() === firstInvite._id.toString());
+      const secondListed = invitations.find(({ _id }) => _id.toString() === secondInvite._id.toString());
+
+      expect(firstListed.status).toBe('revoked');
+      expect(firstListed.invitationLink).toBeUndefined();
+      expect(secondListed).toMatchObject({
+        email: 'storeadmin@example.com',
+        status: 'active',
+        invitationLink: secondInvite.invitationLink,
+      });
+      expect(secondListed.invitedBy.email).toBe(inviter.email);
+
+      const response = await request(app)
+        .get('/api/v1/auth/store-admin/invitations')
+        .set('Authorization', `Bearer ${inviter.generateAccessToken()}`);
+      expect(response.statusCode).toBe(200);
+      expect(response.body.data.invitations).toHaveLength(2);
+    });
+  });
+
   describe('POST /api/v1/auth/register', () => {
     it('should reject direct registration without an invitation', async () => {
       const res = await request(app).post('/api/v1/auth/register').send(validUser);
@@ -78,6 +127,7 @@ describe('Auth API', () => {
       await StoreAdminInvitation.create({
         email: 'invited-admin@example.com',
         tokenHash: crypto.createHash('sha256').update(token).digest('hex'),
+        invitationLink: `http://localhost:5173/register?token=${token}`,
         expiresAt: new Date(Date.now() + 60_000),
         invitedBy: inviter.id,
       });
@@ -100,6 +150,73 @@ describe('Auth API', () => {
       );
       expect(savedUser.faceEmbedding).toHaveLength(128);
       expect(savedUser.faceEnrolledAt).toBeTruthy();
+    });
+
+    it('completes invited registration without an avatar when image hosting fails', async () => {
+      const inviter = await UserModel.create({
+        ...validUser,
+        username: 'imagefailureinviter',
+        email: 'image-failure-inviter@example.com',
+      });
+      const token = 'b'.repeat(64);
+      await StoreAdminInvitation.create({
+        email: 'image-failure-admin@example.com',
+        tokenHash: crypto.createHash('sha256').update(token).digest('hex'),
+        invitationLink: `http://localhost:5173/register?token=${token}`,
+        expiresAt: new Date(Date.now() + 60_000),
+        invitedBy: inviter.id,
+      });
+      uploadImageToImageKit.mockRejectedValueOnce(new Error('Image hosting unavailable'));
+
+      const response = await request(app)
+        .post('/api/v1/auth/store-admin/register')
+        .field('token', token)
+        .field('fullName', 'Image Failure Admin')
+        .field('username', 'imagefailureadmin')
+        .field('password', 'Password123')
+        .attach('image', Buffer.from('registration selfie'), {
+          filename: 'avatar.jpg',
+          contentType: 'image/jpeg',
+        });
+
+      expect(response.statusCode).toBe(201);
+      expect(response.body.data.user.avatar).toBeNull();
+      const savedUser = await UserModel.findOne({ username: 'imagefailureadmin' }).select(
+        '+faceEmbedding',
+      );
+      expect(savedUser.avatar).toBeNull();
+      expect(savedUser.faceEmbedding).toBeUndefined();
+    });
+
+    it('continues invited registration when an optional image has an unsupported type', async () => {
+      const inviter = await UserModel.create({
+        ...validUser,
+        username: 'unsupportedimageinviter',
+        email: 'unsupported-image-inviter@example.com',
+      });
+      const token = 'c'.repeat(64);
+      await StoreAdminInvitation.create({
+        email: 'unsupported-image-admin@example.com',
+        tokenHash: crypto.createHash('sha256').update(token).digest('hex'),
+        invitationLink: `http://localhost:5173/register?token=${token}`,
+        expiresAt: new Date(Date.now() + 60_000),
+        invitedBy: inviter.id,
+      });
+
+      const response = await request(app)
+        .post('/api/v1/auth/store-admin/register')
+        .field('token', token)
+        .field('fullName', 'Unsupported Image Admin')
+        .field('username', 'unsupportedimageadmin')
+        .field('password', 'Password123')
+        .attach('image', Buffer.from('not an image'), {
+          filename: 'avatar.txt',
+          contentType: 'text/plain',
+        });
+
+      expect(response.statusCode).toBe(201);
+      expect(response.body.data.user.avatar).toBeNull();
+      expect(await UserModel.findOne({ username: 'unsupportedimageadmin' })).toBeTruthy();
     });
 
     describe('POST /api/v1/auth/face/enroll', () => {
@@ -135,6 +252,52 @@ describe('Auth API', () => {
         .send({ email: 'test@example.com' });
 
       expect(res.statusCode).toEqual(400);
+    });
+  });
+
+  describe('PATCH /api/v1/auth/profile', () => {
+    it('does not report success when an image field arrives without an uploaded file', async () => {
+      const user = await UserModel.create({
+        ...validUser,
+        username: 'missingprofilephoto',
+        email: 'missing-profile-photo@example.com',
+        isVerified: true,
+      });
+
+      const response = await request(app)
+        .patch('/api/v1/auth/profile')
+        .set('Authorization', `Bearer ${user.generateAccessToken()}`)
+        .send({ image: { name: 'profile.png' } });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.body.message).toBe('Profile image upload was not received');
+      expect((await UserModel.findById(user.id)).avatar).toBeNull();
+    });
+
+    it('uploads and saves a selected profile photo', async () => {
+      const user = await UserModel.create({
+        ...validUser,
+        username: 'profilephoto',
+        email: 'profile-photo@example.com',
+        isVerified: true,
+      });
+      uploadImageToImageKit.mockResolvedValueOnce({
+        url: 'https://ik.imagekit.io/test/profile-avatar.png',
+      });
+
+      const response = await request(app)
+        .patch('/api/v1/auth/profile')
+        .set('Authorization', `Bearer ${user.generateAccessToken()}`)
+        .attach('image', Buffer.from('profile photo'), {
+          filename: 'profile.png',
+          contentType: 'image/png',
+        });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.body.data.avatar).toBe('https://ik.imagekit.io/test/profile-avatar.png');
+      expect((await UserModel.findById(user.id)).avatar).toBe(
+        'https://ik.imagekit.io/test/profile-avatar.png',
+      );
     });
   });
 

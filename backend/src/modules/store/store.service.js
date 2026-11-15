@@ -10,8 +10,6 @@ import { PayrollModel } from '../payroll/payroll.model.js';
 import { ShiftModel } from '../shift/shift.model.js';
 import { ShiftAssignmentModel } from '../shift/shift-assignment.model.js';
 import { NotificationModel } from '../notification/notification.model.js';
-import { MailService } from '../../services/mail.service.js';
-import Config from '../../config/config.js';
 import crypto from 'crypto';
 import { getOrSetCache, deleteCache, deleteCacheByPattern } from '../../utils/cache.js';
 
@@ -284,20 +282,6 @@ export const createStoreManager = async (storeId, managerData, storeAdminId) => 
     }
     if (managerUser) await User.deleteOne({ _id: managerUser._id });
     throw error;
-  }
-
-  // 6. Send credentials email
-  try {
-    await new MailService().SendStaffCredentialsMail(
-      normalizedEmail,
-      fullName,
-      'Store Manager',
-      store.name,
-      password,
-      `${Config.frontend_url || 'http://localhost:5173'}/login`,
-    );
-  } catch (err) {
-    console.error('[Manager Credentials Mail Error]:', err.message);
   }
 
   await invalidateStoreCaches(store._id);

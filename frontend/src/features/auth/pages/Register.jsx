@@ -37,6 +37,7 @@ export default function Register() {
     const [showCPwd, setShowCPwd] = useState(false);
     const [errors, setErrors] = useState({});
     const [avatar, setAvatar] = useState(null);
+    const [avatarNotice, setAvatarNotice] = useState("");
 
     /* Invitation verification state */
     const [verifyingToken, setVerifyingToken] = useState(Boolean(token));
@@ -92,6 +93,28 @@ export default function Register() {
         setForm((prev) => ({ ...prev, [name]: value }));
 
         if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
+    };
+
+    const handleAvatarChange = (event) => {
+        const file = event.target.files?.[0];
+        if (!file) {
+            setAvatar(null);
+            setAvatarNotice("");
+            return;
+        }
+
+        if (
+            !["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
+            file.size > 5 * 1024 * 1024
+        ) {
+            setAvatar(null);
+            setAvatarNotice("Image not uploaded. You can continue registration without it.");
+            event.target.value = "";
+            return;
+        }
+
+        setAvatar(file);
+        setAvatarNotice("");
     };
 
     const handleSubmit = async (e) => {
@@ -335,12 +358,13 @@ export default function Register() {
                                 id="avatar"
                                 type="file"
                                 accept="image/jpeg,image/png,image/webp"
-                                onChange={(event) => setAvatar(event.target.files?.[0] || null)}
+                                onChange={handleAvatarChange}
                                 className="w-full text-sm text-[var(--text-secondary)] file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--primary-soft)] file:px-3 file:py-2 file:text-sm file:font-medium file:text-[var(--primary)]"
                             />
                             <p className="text-xs text-[var(--text-muted)]">
                                 Use a clear photo with only your face visible. You can enroll your face after signing in.
                             </p>
+                            {avatarNotice && <p className="text-xs text-[var(--text-muted)]">{avatarNotice}</p>}
                         </div>
 
                         {/* Password & Confirm Password */}

@@ -23,7 +23,7 @@ const getAction = (req) => {
 
   // --- Store admin invite/approve/reject ---
   if (/\/auth\/store-admin\/invitations$/.test(lowerRoute))
-    return 'Store administrator invitation sent';
+    return 'Store administrator invitation link generated';
   if (/\/auth\/store-admin\/[^/]+\/approve$/.test(lowerRoute))
     return 'Store administrator account approved';
   if (/\/auth\/store-admin\/[^/]+\/reject$/.test(lowerRoute))
