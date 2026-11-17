@@ -1,0 +1,12 @@
+{
+  "testId": "stress-smoke-2026-11-17-171933",
+  "scenario": "smoke",
+  "startTime": "2026-11-17T17:19:33.959Z",
+  "endTime": "2026-11-17T17:19:49.929Z",
+  "durationSeconds": 16,
+  "gitCommit": "e2cd31a",
+  "appVersion": "1.0.0",
+  "targetUrl": "http://localhost:8000/api/v1",
+  "environment": "development",
+  "k6ExitCode": 0
+}
