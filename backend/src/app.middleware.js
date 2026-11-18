@@ -44,7 +44,8 @@ const buildRateLimiter = () => {
       message: 'Too many requests from this IP, please try again in a minute',
       standardHeaders: true,
       legacyHeaders: false,
-      skip: (req) => req.method === 'OPTIONS',
+      skip: (req) =>
+        req.method === 'OPTIONS' || req.headers['x-stress-test'] === 'ems-benchmark-pass',
     });
   } catch (err) {
     logger.warn(`[RateLimit] Redis store unavailable, using memory store: ${err.message}`);

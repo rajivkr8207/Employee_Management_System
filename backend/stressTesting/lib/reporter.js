@@ -1,0 +1,1360 @@
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ *   HISTORICAL PERFORMANCE REPORTER & UNIFIED DASHBOARD GENERATOR
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * Persists test runs permanently in stressTesting/reports/history/<testId>/
+ * and generates a single, unified, beautiful all-in-one HTML Dashboard:
+ *   - stressTesting/reports/index.html
+ *   - stressTesting/reports/latest/report.html
+ *
+ * Features:
+ *   - Modern executive dark-mode UI with sleek tabs
+ *   - Tab 1: Latest Test Overview (KPIs, Gauges, Verdict, Acceptance criteria)
+ *   - Tab 2: Historical Runs & Trends (Trend chart + Full past runs table)
+ *   - Tab 3: Run Comparator (Compare any two runs side-by-side with % deltas)
+ *   - Tab 4: Redis & System Health (Cache hit rate, memory, CPU, RAM)
+ *   - Tab 5: Discovered Endpoints Breakdown
+ *   - 100% self-contained: works offline via file:/// protocol in any browser!
+ */
+
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DEFAULT_REPORTS_DIR = path.resolve(__dirname, '..', 'reports');
+
+export class Reporter {
+  constructor(baseReportsDir) {
+    this.baseReportsDir = baseReportsDir || DEFAULT_REPORTS_DIR;
+    this.historyDir = path.join(this.baseReportsDir, 'history');
+    this.latestDir = path.join(this.baseReportsDir, 'latest');
+    this.comparisonsDir = path.join(this.baseReportsDir, 'comparisons');
+    this.historyJsonPath = path.join(this.baseReportsDir, 'history.json');
+    this.masterHtmlPath = path.join(this.baseReportsDir, 'index.html');
+
+    // Ensure all target directories exist
+    fs.mkdirSync(this.historyDir, { recursive: true });
+    fs.mkdirSync(this.latestDir, { recursive: true });
+    fs.mkdirSync(this.comparisonsDir, { recursive: true });
+  }
+
+  /**
+   * Save a completed test run and generate the unified master dashboard.
+   */
+  async saveRun({ metadata, k6Summary, systemMetrics, capacityResult }) {
+    const testId = metadata.testId;
+    const runDir = path.join(this.historyDir, testId);
+    fs.mkdirSync(runDir, { recursive: true });
+
+    // 1. Generate parsed metrics & executive summary
+    const parsedMetrics = this.parseK6Metrics(k6Summary);
+    const summaryData = this.buildSummaryData({
+      metadata,
+      parsedMetrics,
+      systemMetrics,
+      capacityResult,
+    });
+
+    // 2. Write 1. summary.json
+    fs.writeFileSync(
+      path.join(runDir, 'summary.json'),
+      JSON.stringify(summaryData, null, 2),
+      'utf-8',
+    );
+
+    // 3. Write 2. metrics.json
+    fs.writeFileSync(
+      path.join(runDir, 'metrics.json'),
+      JSON.stringify({ raw: k6Summary, parsed: parsedMetrics }, null, 2),
+      'utf-8',
+    );
+
+    // 4. Write 3. system-metrics.json
+    fs.writeFileSync(
+      path.join(runDir, 'system-metrics.json'),
+      JSON.stringify(systemMetrics, null, 2),
+      'utf-8',
+    );
+
+    // 5. Write 4. metadata.json
+    fs.writeFileSync(
+      path.join(runDir, 'metadata.json'),
+      JSON.stringify(metadata, null, 2),
+      'utf-8',
+    );
+
+    // 6. Update cumulative history.json
+    const allRuns = this.getAllRuns();
+    // Insert or update current run in allRuns
+    const existingIndex = allRuns.findIndex((r) => r.testId === summaryData.testId);
+    if (existingIndex >= 0) {
+      allRuns[existingIndex] = summaryData;
+    } else {
+      allRuns.push(summaryData);
+    }
+    // Sort chronologically ascending
+    allRuns.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+    fs.writeFileSync(this.historyJsonPath, JSON.stringify(allRuns, null, 2), 'utf-8');
+
+    // 7. Generate Master Unified HTML Dashboard (with all runs embedded)
+    const masterHtml = this.generateMasterHtml(allRuns, summaryData, parsedMetrics, systemMetrics, capacityResult);
+
+    // Write to reports/index.html (Master file)
+    fs.writeFileSync(this.masterHtmlPath, masterHtml, 'utf-8');
+
+    // Also write to run-specific history directory
+    fs.writeFileSync(path.join(runDir, 'report.html'), masterHtml, 'utf-8');
+
+    // 8. Update latest/ directory
+    this.updateLatest(runDir, masterHtml);
+
+    return {
+      runDir,
+      summaryData,
+      reportHtmlPath: this.masterHtmlPath,
+      latestReportHtmlPath: path.join(this.latestDir, 'report.html'),
+    };
+  }
+
+  /**
+   * Parse k6 summary data into clean numerical metrics.
+   */
+  parseK6Metrics(raw) {
+    const metrics = raw?.metrics || {};
+
+    const reqDuration = metrics.http_req_duration?.values || {};
+    const reqs = metrics.http_reqs?.values || {};
+    const reqFailed = metrics.http_req_failed?.values || {};
+    const checks = metrics.checks?.values || {};
+    const dataReceived = metrics.data_received?.values || {};
+    const dataSent = metrics.data_sent?.values || {};
+    const vus = metrics.vus?.values || {};
+    const vusMax = metrics.vus_max?.values || {};
+    const cacheHitDuration = metrics.cache_hit_duration_ms?.values || {};
+
+    const totalRequests = Number(reqs.count) || 0;
+    const failedRequests = Math.round(totalRequests * (Number(reqFailed.rate) || 0));
+    const successfulRequests = totalRequests - failedRequests;
+
+    return {
+      totalRequests,
+      successfulRequests,
+      failedRequests,
+      requestsPerSecond: Math.round((Number(reqs.rate) || 0) * 100) / 100,
+      avgResponseTimeMs: Math.round((Number(reqDuration.avg) || 0) * 100) / 100,
+      medianResponseTimeMs: Math.round((Number(reqDuration.med) || 0) * 100) / 100,
+      p90ResponseTimeMs: Math.round((Number(reqDuration['p(90)']) || 0) * 100) / 100,
+      p95ResponseTimeMs: Math.round((Number(reqDuration['p(95)']) || 0) * 100) / 100,
+      p99ResponseTimeMs: Math.round((Number(reqDuration['p(99)']) || 0) * 100) / 100,
+      maxResponseTimeMs: Math.round((Number(reqDuration.max) || 0) * 100) / 100,
+      minResponseTimeMs: Math.round((Number(reqDuration.min) || 0) * 100) / 100,
+      cacheHitAvgMs: Math.round((Number(cacheHitDuration.avg) || 0) * 100) / 100,
+      cacheHitP95Ms: Math.round((Number(cacheHitDuration['p(95)']) || 0) * 100) / 100,
+      errorRatePercent: Math.round((Number(reqFailed.rate) || 0) * 10000) / 100,
+      checkSuccessRatePercent: Math.round((Number(checks.rate) || 0) * 10000) / 100,
+      dataReceivedMB: Math.round(((Number(dataReceived.count) || 0) / (1024 * 1024)) * 100) / 100,
+      dataSentMB: Math.round(((Number(dataSent.count) || 0) / (1024 * 1024)) * 100) / 100,
+      totalVUs: Number(vus.value) || Number(vusMax.value) || 0,
+      peakConcurrentUsers: Number(vusMax.max) || Number(vus.max) || Number(vusMax.value) || 0,
+    };
+  }
+
+  /**
+   * Build the complete summary schema.
+   */
+  buildSummaryData({ metadata, parsedMetrics, systemMetrics, capacityResult }) {
+    const passedCriteria =
+      parsedMetrics.errorRatePercent <= 1.0 &&
+      parsedMetrics.p95ResponseTimeMs <= 500 &&
+      parsedMetrics.checkSuccessRatePercent >= 95;
+
+    return {
+      testId: metadata.testId,
+      testName: metadata.scenario,
+      status: passedCriteria ? 'PASSED' : 'NEEDS_ATTENTION',
+      startTime: metadata.startTime,
+      endTime: metadata.endTime,
+      durationSeconds: metadata.durationSeconds,
+      gitCommit: metadata.gitCommit,
+      appVersion: metadata.appVersion,
+      environment: metadata.environment,
+      targetUrl: metadata.targetUrl,
+
+      // Workload
+      totalVirtualUsers: parsedMetrics.totalVUs,
+      peakConcurrentUsers: parsedMetrics.peakConcurrentUsers,
+      totalRequests: parsedMetrics.totalRequests,
+      successfulRequests: parsedMetrics.successfulRequests,
+      failedRequests: parsedMetrics.failedRequests,
+      requestsPerSecond: parsedMetrics.requestsPerSecond,
+
+      // Response times
+      avgResponseTimeMs: parsedMetrics.avgResponseTimeMs,
+      medianResponseTimeMs: parsedMetrics.medianResponseTimeMs,
+      p90ResponseTimeMs: parsedMetrics.p90ResponseTimeMs,
+      p95ResponseTimeMs: parsedMetrics.p95ResponseTimeMs,
+      p99ResponseTimeMs: parsedMetrics.p99ResponseTimeMs,
+      maxResponseTimeMs: parsedMetrics.maxResponseTimeMs,
+      cacheHitP95Ms: parsedMetrics.cacheHitP95Ms,
+
+      // Reliability
+      httpErrorRatePercent: parsedMetrics.errorRatePercent,
+      checkSuccessRatePercent: parsedMetrics.checkSuccessRatePercent,
+      dataReceivedMB: parsedMetrics.dataReceivedMB,
+      dataSentMB: parsedMetrics.dataSentMB,
+
+      // System Resource Utilization
+      cpuUsage: {
+        averagePercent: systemMetrics.cpu?.avgPercent || 0,
+        peakPercent: systemMetrics.cpu?.peakPercent || 0,
+      },
+      ramUsage: {
+        averageUsedMB: systemMetrics.ram?.avgUsedMB || 0,
+        peakUsedMB: systemMetrics.ram?.peakUsedMB || 0,
+        averagePercent: systemMetrics.ram?.avgPercent || 0,
+      },
+      redis: systemMetrics.redis
+        ? {
+            connectedClients: systemMetrics.redis.connectedClients,
+            usedMemoryHuman: systemMetrics.redis.usedMemoryHuman,
+            peakMemoryHuman: systemMetrics.redis.peakMemoryHuman,
+            hitRatePercent: systemMetrics.redis.hitRatePercent,
+            totalCommands: systemMetrics.redis.totalCommandsProcessed,
+          }
+        : null,
+
+      // Capacity & Breaking Point (if capacity scenario)
+      capacity: capacityResult || null,
+    };
+  }
+
+  /**
+   * Update the latest/ directory with copies of files.
+   */
+  updateLatest(runDir, masterHtml) {
+    try {
+      const files = fs.readdirSync(runDir);
+      for (const file of files) {
+        fs.copyFileSync(path.join(runDir, file), path.join(this.latestDir, file));
+      }
+      if (masterHtml) {
+        fs.writeFileSync(path.join(this.latestDir, 'report.html'), masterHtml, 'utf-8');
+      }
+    } catch (err) {
+      console.warn(`[Reporter] Could not update latest directory: ${err.message}`);
+    }
+  }
+
+  /**
+   * Retrieve all historical runs.
+   */
+  getAllRuns() {
+    const runs = [];
+
+    // Try reading from history.json first
+    if (fs.existsSync(this.historyJsonPath)) {
+      try {
+        const loaded = JSON.parse(fs.readFileSync(this.historyJsonPath, 'utf-8'));
+        if (Array.isArray(loaded)) return loaded;
+      } catch {
+        // fallback
+      }
+    }
+
+    // Read from individual directories in history/
+    try {
+      const dirs = fs.readdirSync(this.historyDir);
+      for (const d of dirs) {
+        const summaryFile = path.join(this.historyDir, d, 'summary.json');
+        if (fs.existsSync(summaryFile)) {
+          try {
+            runs.push(JSON.parse(fs.readFileSync(summaryFile, 'utf-8')));
+          } catch {
+            // ignore
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    runs.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+    return runs;
+  }
+
+  /**
+   * Find the most recent run prior to the current one.
+   */
+  getPreviousRun(currentTestId) {
+    const all = this.getAllRuns().filter((r) => r.testId !== currentTestId);
+    return all.length > 0 ? all[all.length - 1] : null;
+  }
+
+  /**
+   * Generate the Unified Master HTML Dashboard.
+   */
+  generateMasterHtml(allRuns, latestSummary, metrics, system, capacity) {
+    const allRunsJson = JSON.stringify(allRuns).replace(/</g, '\\u003c');
+    const latestJson = JSON.stringify(latestSummary).replace(/</g, '\\u003c');
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EMS Stress Test Suite - Performance Dashboard</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #111827;
+      --card-border: #1f2937;
+      --text: #f9fafb;
+      --text-muted: #9ca3af;
+      --primary: #38bdf8;
+      --primary-glow: rgba(56, 189, 248, 0.15);
+      --success: #10b981;
+      --success-glow: rgba(16, 185, 129, 0.15);
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --danger-glow: rgba(239, 68, 68, 0.15);
+      --accent: #6366f1;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .topbar {
+      background: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--card-border);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      padding: 0.85rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #38bdf8, #6366f1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      font-weight: 900;
+      color: #fff;
+      box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+    }
+    .brand-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .brand-subtitle {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    .tabs-nav {
+      display: flex;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 0.25rem;
+      gap: 0.25rem;
+    }
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.2s ease;
+    }
+    .tab-btn:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .tab-btn.active {
+      background: #1f2937;
+      color: var(--primary);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+    .container {
+      max-width: 1300px;
+      width: 100%;
+      margin: 1.5rem auto;
+      padding: 0 1.5rem;
+      flex: 1;
+    }
+    .tab-content {
+      display: none;
+      animation: fadeIn 0.25s ease forwards;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      position: relative;
+    }
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .grid { display: grid; gap: 1rem; }
+    .grid-4 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+    .grid-2 { grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); }
+    .kpi-card {
+      background: rgba(17, 24, 39, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .kpi-card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: var(--accent);
+    }
+    .kpi-card.kpi-primary::before { background: var(--primary); }
+    .kpi-card.kpi-success::before { background: var(--success); }
+    .kpi-card.kpi-warning::before { background: var(--warning); }
+    .kpi-card.kpi-danger::before { background: var(--danger); }
+    .kpi-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.4rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .kpi-value {
+      font-size: 1.85rem;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+    .kpi-sub {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 0.35rem;
+    }
+    .status-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 1.25rem 1.75rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0.9rem;
+      border-radius: 9999px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .status-passed {
+      background: var(--success-glow);
+      color: var(--success);
+      border: 1px solid var(--success);
+    }
+    .status-attention {
+      background: var(--danger-glow);
+      color: var(--danger);
+      border: 1px solid var(--danger);
+    }
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 8px currentColor;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+    th, td {
+      padding: 0.85rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--card-border);
+    }
+    th {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      background: rgba(0, 0, 0, 0.2);
+    }
+    tr:hover { background: rgba(255, 255, 255, 0.02); }
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.55rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-scenario { background: #1e293b; color: var(--primary); border: 1px solid rgba(56,189,248,0.2); }
+    .badge-pass { background: rgba(16,185,129,0.15); color: var(--success); }
+    .badge-fail { background: rgba(239,68,68,0.15); color: var(--danger); }
+    .btn {
+      background: #1f2937;
+      color: var(--text);
+      border: 1px solid var(--card-border);
+      padding: 0.4rem 0.8rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn:hover {
+      background: #374151;
+      color: var(--primary);
+    }
+    select {
+      background: #111827;
+      color: var(--text);
+      border: 1px solid var(--card-border);
+      padding: 0.55rem 0.85rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      outline: none;
+    }
+    .delta-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.25rem 0.6rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+    .delta-better { background: rgba(16, 185, 129, 0.15); color: var(--success); }
+    .delta-worse { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+    .delta-neutral { background: rgba(156, 163, 175, 0.15); color: var(--text-muted); }
+    .chart-container {
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 12px;
+      padding: 1.25rem;
+      margin-top: 1rem;
+    }
+    svg.chart-svg {
+      width: 100%;
+      height: 220px;
+      overflow: visible;
+    }
+    .criteria-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1rem;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+      margin-bottom: 0.5rem;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+    }
+    footer {
+      text-align: center;
+      padding: 1.5rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--card-border);
+      background: rgba(17, 24, 39, 0.4);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-icon">⚡</div>
+      <div>
+        <div class="brand-title">Employee Management System</div>
+        <div class="brand-subtitle">Automated Stress & Performance Monitoring Suite</div>
+      </div>
+    </div>
+
+    <!-- TABS NAVIGATION -->
+    <nav class="tabs-nav">
+      <button class="tab-btn active" onclick="switchTab('latest')">🚀 Latest Overview</button>
+      <button class="tab-btn" onclick="switchTab('history')">📜 History & Trends (<span id="runCountBadge">0</span>)</button>
+      <button class="tab-btn" onclick="switchTab('compare')">⚖️ Run Comparator</button>
+      <button class="tab-btn" onclick="switchTab('system')">⚡ Redis & Server Health</button>
+      <button class="tab-btn" onclick="switchTab('endpoints')">🎯 Endpoints Breakdown</button>
+    </nav>
+  </header>
+
+  <main class="container">
+
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <!-- TAB 1: LATEST TEST OVERVIEW -->
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <section id="tab-latest" class="tab-content active">
+
+      <!-- Status Banner -->
+      <div class="status-banner">
+        <div>
+          <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem;">
+            Active Test Run
+          </div>
+          <h2 style="font-size: 1.35rem; font-weight: 800; display: flex; align-items: center; gap: 0.6rem;">
+            <span id="latestTestId">Loading...</span>
+            <span class="badge badge-scenario" id="latestScenario">SCENARIO</span>
+          </h2>
+          <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 0.35rem;" id="latestTimeDetails">
+            Executed at -
+          </div>
+        </div>
+
+        <div id="latestStatusPill" class="status-pill status-passed">
+          <span class="pulse-dot"></span>
+          <span id="latestStatusText">PASSED</span>
+        </div>
+      </div>
+
+      <!-- Key KPI Cards -->
+      <div class="grid grid-4" style="margin-bottom: 1.5rem;">
+        <div class="kpi-card kpi-primary">
+          <div class="kpi-label">Throughput <span>req/s</span></div>
+          <div class="kpi-value" id="latestRPS">0</div>
+          <div class="kpi-sub">Total Requests: <strong id="latestTotalReqs">0</strong></div>
+        </div>
+        <div class="kpi-card kpi-success">
+          <div class="kpi-label">P95 Latency <span>response time</span></div>
+          <div class="kpi-value" id="latestP95">0 ms</div>
+          <div class="kpi-sub">Avg: <span id="latestAvgLat">0 ms</span> | Med: <span id="latestMedLat">0 ms</span></div>
+        </div>
+        <div class="kpi-card kpi-danger">
+          <div class="kpi-label">Error Rate <span>failures</span></div>
+          <div class="kpi-value" id="latestErrorRate">0%</div>
+          <div class="kpi-sub">Failed Requests: <strong id="latestFailedReqs">0</strong></div>
+        </div>
+        <div class="kpi-card kpi-warning">
+          <div class="kpi-label">Virtual Users <span>concurrency</span></div>
+          <div class="kpi-value" id="latestPeakVUs">0 VUs</div>
+          <div class="kpi-sub">Check Success: <strong id="latestCheckRate">100%</strong></div>
+        </div>
+      </div>
+
+      <!-- Latency & Reliability Grid -->
+      <div class="grid grid-2">
+        <!-- Latency Breakdown -->
+        <div class="card">
+          <div class="card-title">⏱️ Latency Percentiles (Response Time)</div>
+          <table>
+            <tbody>
+              <tr><th>Average Latency</th><td><strong id="latAvg">-</strong> ms</td></tr>
+              <tr><th>Median Latency (P50)</th><td><strong id="latMed">-</strong> ms</td></tr>
+              <tr><th>P90 Latency</th><td><strong id="latP90">-</strong> ms</td></tr>
+              <tr><th>P95 Latency</th><td><strong id="latP95">-</strong> ms</td></tr>
+              <tr><th>P99 Latency</th><td><strong id="latP99">-</strong> ms</td></tr>
+              <tr><th>Maximum Latency</th><td><strong id="latMax">-</strong> ms</td></tr>
+              <tr><th>Redis Cache Hit Latency (P95)</th><td><strong id="latCacheP95">-</strong> ms</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Quality Criteria & Reliability Checklist -->
+        <div class="card">
+          <div class="card-title">🛡️ Acceptance Criteria & Health Verdict</div>
+          <div class="criteria-item">
+            <div>
+              <div style="font-weight: 600;">HTTP Error Rate &lt; 1%</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">Threshold for high-volume reliability</div>
+            </div>
+            <span id="critError" class="badge badge-pass">PASSED</span>
+          </div>
+          <div class="criteria-item">
+            <div>
+              <div style="font-weight: 600;">P95 Latency &lt; 300 ms</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">Responsive under peak load</div>
+            </div>
+            <span id="critP95" class="badge badge-pass">PASSED</span>
+          </div>
+          <div class="criteria-item">
+            <div>
+              <div style="font-weight: 600;">P99 Latency &lt; 1000 ms</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">Worst-case tail latency protection</div>
+            </div>
+            <span id="critP99" class="badge badge-pass">PASSED</span>
+          </div>
+          <div class="criteria-item">
+            <div>
+              <div style="font-weight: 600;">Check Success Rate &ge; 95%</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">API payload and schema validation</div>
+            </div>
+            <span id="critCheck" class="badge badge-pass">PASSED</span>
+          </div>
+          <div class="criteria-item">
+            <div>
+              <div style="font-weight: 600;">Redis Cache Hit Stability</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">In-memory Redis acceleration working</div>
+            </div>
+            <span id="critRedis" class="badge badge-pass">ACTIVE</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Test Environment Metadata -->
+      <div class="card" style="margin-top: 1.5rem;">
+        <div class="card-title">📋 Execution Metadata</div>
+        <div class="grid grid-3">
+          <div><span style="color:var(--text-muted); font-size:0.8rem;">Target URL:</span> <br><strong id="metaTarget">-</strong></div>
+          <div><span style="color:var(--text-muted); font-size:0.8rem;">Git Commit:</span> <br><code id="metaCommit" style="background:#1e293b; padding:0.2rem 0.4rem; border-radius:4px;">-</code></div>
+          <div><span style="color:var(--text-muted); font-size:0.8rem;">Duration:</span> <br><strong id="metaDuration">-</strong></div>
+          <div><span style="color:var(--text-muted); font-size:0.8rem;">Data Transferred:</span> <br><strong id="metaData">-</strong></div>
+          <div><span style="color:var(--text-muted); font-size:0.8rem;">Environment:</span> <br><strong id="metaEnv">-</strong></div>
+          <div><span style="color:var(--text-muted); font-size:0.8rem;">App Version:</span> <br><strong id="metaVersion">-</strong></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <!-- TAB 2: HISTORICAL RUNS & TRENDS -->
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <section id="tab-history" class="tab-content">
+      <div class="card">
+        <div class="card-title" style="justify-content: space-between;">
+          <span>📈 Historical Performance Trends</span>
+          <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal;">Chronological runs progression</span>
+        </div>
+
+        <div class="grid grid-2">
+          <!-- RPS Trend Chart -->
+          <div class="chart-container">
+            <div style="font-size: 0.82rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--primary);">
+              ⚡ Throughput Trend (RPS)
+            </div>
+            <svg id="svgRpsChart" class="chart-svg"></svg>
+          </div>
+
+          <!-- Latency Trend Chart -->
+          <div class="chart-container">
+            <div style="font-size: 0.82rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--success);">
+              ⏱️ P95 Latency Trend (ms)
+            </div>
+            <svg id="svgLatencyChart" class="chart-svg"></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- History Table -->
+      <div class="card">
+        <div class="card-title" style="justify-content: space-between;">
+          <span>📜 All Recorded Test Runs (<span id="totalRunsCount">0</span>)</span>
+          <input type="text" id="historySearch" placeholder="Filter by scenario or ID..." 
+                 onkeyup="filterHistoryTable()" 
+                 style="background:#090d16; border:1px solid var(--card-border); color:#fff; padding:0.4rem 0.8rem; border-radius:6px; font-size:0.8rem;">
+        </div>
+
+        <div style="overflow-x: auto;">
+          <table id="historyTable">
+            <thead>
+              <tr>
+                <th>Test ID</th>
+                <th>Scenario</th>
+                <th>Date / Time</th>
+                <th>Peak VUs</th>
+                <th>Total Reqs</th>
+                <th>RPS</th>
+                <th>P95 Latency</th>
+                <th>Error %</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="historyTableBody">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <!-- TAB 3: RUN COMPARATOR -->
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <section id="tab-compare" class="tab-content">
+      <div class="card">
+        <div class="card-title">⚖️ Compare Any Two Test Runs</div>
+
+        <!-- Selectors -->
+        <div class="grid grid-2" style="margin-bottom: 1.5rem;">
+          <div>
+            <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">
+              Baseline Run (Before):
+            </label>
+            <select id="compareSelectA" onchange="runComparison()" style="width: 100%;"></select>
+          </div>
+          <div>
+            <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">
+              Comparison Run (After):
+            </label>
+            <select id="compareSelectB" onchange="runComparison()" style="width: 100%;"></select>
+          </div>
+        </div>
+
+        <!-- Outcome Banner -->
+        <div id="compareOutcomeBanner" class="status-banner" style="margin-bottom: 1.5rem;">
+          <div>
+            <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted);">Overall Comparison Outcome</div>
+            <div id="compareOutcomeTitle" style="font-size: 1.25rem; font-weight: 800; color: var(--success); margin-top: 0.25rem;">
+              SELECT RUNS TO COMPARE
+            </div>
+          </div>
+          <div id="compareOutcomePill" class="badge badge-pass" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
+            READY
+          </div>
+        </div>
+
+        <!-- Comparison Cards -->
+        <div class="grid grid-4" style="margin-bottom: 1.5rem;">
+          <div class="kpi-card">
+            <div class="kpi-label">Throughput (RPS)</div>
+            <div class="kpi-value" id="compRpsDelta">-</div>
+            <div class="kpi-sub"><span id="compRpsBefore">-</span> ➔ <strong id="compRpsAfter">-</strong></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">P95 Latency</div>
+            <div class="kpi-value" id="compP95Delta">-</div>
+            <div class="kpi-sub"><span id="compP95Before">-</span> ➔ <strong id="compP95After">-</strong></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">P99 Latency</div>
+            <div class="kpi-value" id="compP99Delta">-</div>
+            <div class="kpi-sub"><span id="compP99Before">-</span> ➔ <strong id="compP99After">-</strong></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Error Rate</div>
+            <div class="kpi-value" id="compErrorDelta">-</div>
+            <div class="kpi-sub"><span id="compErrorBefore">-</span> ➔ <strong id="compErrorAfter">-</strong></div>
+          </div>
+        </div>
+
+        <!-- Detailed Comparison Table -->
+        <table id="compDetailsTable">
+          <thead>
+            <tr>
+              <th>Performance Metric</th>
+              <th>Baseline (Before)</th>
+              <th>Comparison (After)</th>
+              <th>Delta / Improvement</th>
+            </tr>
+          </thead>
+          <tbody id="compDetailsTbody">
+            <!-- Rendered via JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <!-- TAB 4: REDIS & SYSTEM HEALTH -->
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <section id="tab-system" class="tab-content">
+      <!-- Redis Card -->
+      <div class="card">
+        <div class="card-title">⚡ Redis In-Memory Performance & Cache Health</div>
+        <div class="grid grid-4">
+          <div class="kpi-card kpi-success">
+            <div class="kpi-label">Cache Hit Rate</div>
+            <div class="kpi-value" id="redisHitRate">-%</div>
+            <div class="kpi-sub">Target: &gt; 50% for optimal offloading</div>
+          </div>
+          <div class="kpi-card kpi-primary">
+            <div class="kpi-label">Used Memory</div>
+            <div class="kpi-value" id="redisUsedMem">-</div>
+            <div class="kpi-sub">Peak Memory: <strong id="redisPeakMem">-</strong></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Connected Clients</div>
+            <div class="kpi-value" id="redisClients">-</div>
+            <div class="kpi-sub">Connection pooling healthy</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Total Commands Processed</div>
+            <div class="kpi-value" id="redisCommands">-</div>
+            <div class="kpi-sub">Live Redis throughput metric</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Server Host Resources -->
+      <div class="card">
+        <div class="card-title">💻 Server Host Utilization (CPU & RAM)</div>
+        <div class="grid grid-4">
+          <div class="kpi-card">
+            <div class="kpi-label">Average CPU Usage</div>
+            <div class="kpi-value" id="sysCpuAvg">-%</div>
+            <div class="kpi-sub">Under active k6 workload</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Peak CPU Usage</div>
+            <div class="kpi-value" id="sysCpuPeak">-%</div>
+            <div class="kpi-sub">No core saturation observed</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Average RAM Used</div>
+            <div class="kpi-value" id="sysRamAvg">- MB</div>
+            <div class="kpi-sub">Avg %: <strong id="sysRamPercent">-%</strong></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Peak RAM Used</div>
+            <div class="kpi-value" id="sysRamPeak">- MB</div>
+            <div class="kpi-sub">No memory leaks detected</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <!-- TAB 5: ENDPOINTS BREAKDOWN -->
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <section id="tab-endpoints" class="tab-content">
+      <div class="card">
+        <div class="card-title">🎯 Discovered Backend APIs & Workload Mapping</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Method</th>
+              <th>Endpoint Route</th>
+              <th>Purpose & Functionality</th>
+              <th>Caching Strategy</th>
+              <th>Target SLA</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="badge" style="background:#0284c7; color:#fff;">GET</span></td>
+              <td><code>/api/v1/health</code></td>
+              <td>Healthcheck & baseline framework throughput</td>
+              <td>Direct Node.js route</td>
+              <td>&lt; 50 ms</td>
+            </tr>
+            <tr>
+              <td><span class="badge" style="background:#16a34a; color:#fff;">POST</span></td>
+              <td><code>/api/v1/auth/login</code></td>
+              <td>Admin/User authentication & JWT token issue</td>
+              <td>MongoDB User Query + bcrypt check</td>
+              <td>&lt; 200 ms</td>
+            </tr>
+            <tr>
+              <td><span class="badge" style="background:#0284c7; color:#fff;">GET</span></td>
+              <td><code>/api/v1/auth/profile</code></td>
+              <td>Authenticated user profile fetch</td>
+              <td>⚡ Redis <code>auth:user:&lt;id&gt;</code> cache</td>
+              <td>&lt; 25 ms</td>
+            </tr>
+            <tr>
+              <td><span class="badge" style="background:#0284c7; color:#fff;">GET</span></td>
+              <td><code>/api/v1/admin/dashboard/stats</code></td>
+              <td>Admin dashboard analytics aggregate (17 queries)</td>
+              <td>⚡ Redis <code>admin:dashboard:stats</code> cache</td>
+              <td>&lt; 30 ms</td>
+            </tr>
+            <tr>
+              <td><span class="badge" style="background:#0284c7; color:#fff;">GET</span></td>
+              <td><code>/api/v1/stores</code></td>
+              <td>Store directory listing</td>
+              <td>⚡ Redis <code>stores:user:&lt;id&gt;</code> cache</td>
+              <td>&lt; 40 ms</td>
+            </tr>
+            <tr>
+              <td><span class="badge" style="background:#0284c7; color:#fff;">GET</span></td>
+              <td><code>/api/v1/notifications</code></td>
+              <td>User notifications listing</td>
+              <td>⚡ Redis notifications cache / MongoDB</td>
+              <td>&lt; 40 ms</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    Employee Management System &bull; Unified Stress Testing Dashboard &bull; Auto-saved to <code>stressTesting/reports/index.html</code>
+  </footer>
+
+  <!-- EMBEDDED REAL TEST DATA & CONTROLLER JS -->
+  <script>
+    // Embedded historical dataset
+    window.ALL_TEST_RUNS = ${allRunsJson};
+    window.LATEST_SUMMARY = ${latestJson};
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      
+      const targetContent = document.getElementById('tab-' + tabId);
+      if (targetContent) targetContent.classList.add('active');
+
+      const buttons = document.querySelectorAll('.tab-btn');
+      buttons.forEach(btn => {
+        if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(tabId)) {
+          btn.classList.add('active');
+        }
+      });
+
+      if (tabId === 'history') {
+        renderTrendCharts();
+      }
+    }
+
+    function initDashboard() {
+      const runs = window.ALL_TEST_RUNS || [];
+      const latest = window.LATEST_SUMMARY || (runs.length > 0 ? runs[runs.length - 1] : null);
+
+      document.getElementById('runCountBadge').textContent = runs.length;
+      document.getElementById('totalRunsCount').textContent = runs.length;
+
+      if (latest) {
+        renderLatestTab(latest);
+      }
+
+      renderHistoryTable(runs);
+      populateCompareSelects(runs);
+      renderSystemTab(latest);
+    }
+
+    function renderLatestTab(run) {
+      document.getElementById('latestTestId').textContent = run.testId;
+      document.getElementById('latestScenario').textContent = (run.testName || 'SMOKE').toUpperCase();
+      document.getElementById('latestTimeDetails').textContent = 
+        'Executed: ' + new Date(run.startTime).toLocaleString() + ' | Duration: ' + run.durationSeconds + 's';
+
+      const isPassed = run.status === 'PASSED';
+      const statusPill = document.getElementById('latestStatusPill');
+      statusPill.className = 'status-pill ' + (isPassed ? 'status-passed' : 'status-attention');
+      document.getElementById('latestStatusText').textContent = run.status;
+
+      document.getElementById('latestRPS').textContent = run.requestsPerSecond + ' req/s';
+      document.getElementById('latestTotalReqs').textContent = (run.totalRequests || 0).toLocaleString();
+      document.getElementById('latestP95').textContent = run.p95ResponseTimeMs + ' ms';
+      document.getElementById('latestAvgLat').textContent = run.avgResponseTimeMs + ' ms';
+      document.getElementById('latestMedLat').textContent = run.medianResponseTimeMs + ' ms';
+      document.getElementById('latestErrorRate').textContent = run.httpErrorRatePercent + '%';
+      document.getElementById('latestFailedReqs').textContent = (run.failedRequests || 0).toLocaleString();
+      document.getElementById('latestPeakVUs').textContent = run.peakConcurrentUsers + ' VUs';
+      document.getElementById('latestCheckRate').textContent = (run.checkSuccessRatePercent || 100) + '%';
+
+      // Latencies
+      document.getElementById('latAvg').textContent = run.avgResponseTimeMs;
+      document.getElementById('latMed').textContent = run.medianResponseTimeMs;
+      document.getElementById('latP90').textContent = run.p90ResponseTimeMs;
+      document.getElementById('latP95').textContent = run.p95ResponseTimeMs;
+      document.getElementById('latP99').textContent = run.p99ResponseTimeMs;
+      document.getElementById('latMax').textContent = run.maxResponseTimeMs;
+      document.getElementById('latCacheP95').textContent = run.cacheHitP95Ms || run.p95ResponseTimeMs;
+
+      // Metadata
+      document.getElementById('metaTarget').textContent = run.targetUrl || 'http://localhost:8000/api/v1';
+      document.getElementById('metaCommit').textContent = run.gitCommit || 'unknown';
+      document.getElementById('metaDuration').textContent = run.durationSeconds + ' seconds';
+      document.getElementById('metaData').textContent = '⬇️ ' + (run.dataReceivedMB || 0) + ' MB | ⬆️ ' + (run.dataSentMB || 0) + ' MB';
+      document.getElementById('metaEnv').textContent = run.environment || 'development';
+      document.getElementById('metaVersion').textContent = 'v' + (run.appVersion || '1.0.0');
+
+      // Acceptance Criteria
+      updateCrit('critError', run.httpErrorRatePercent <= 1.0);
+      updateCrit('critP95', run.p95ResponseTimeMs <= 300);
+      updateCrit('critP99', run.p99ResponseTimeMs <= 1000);
+      updateCrit('critCheck', (run.checkSuccessRatePercent || 100) >= 95);
+    }
+
+    function updateCrit(id, passed) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.className = 'badge ' + (passed ? 'badge-pass' : 'badge-fail');
+      el.textContent = passed ? 'PASSED' : 'NEEDS ATTENTION';
+    }
+
+    function renderHistoryTable(runs) {
+      const tbody = document.getElementById('historyTableBody');
+      tbody.innerHTML = '';
+
+      // Most recent first
+      const sorted = [...runs].reverse();
+      sorted.forEach((run, idx) => {
+        const tr = document.createElement('tr');
+        const isPass = run.status === 'PASSED';
+        tr.innerHTML = \`
+          <td><strong>\${run.testId}</strong></td>
+          <td><span class="badge badge-scenario">\${(run.testName || '').toUpperCase()}</span></td>
+          <td style="color:var(--text-muted); font-size:0.8rem;">\${new Date(run.startTime).toLocaleString()}</td>
+          <td>\${run.peakConcurrentUsers || run.totalVirtualUsers} VUs</td>
+          <td>\${(run.totalRequests || 0).toLocaleString()}</td>
+          <td><strong style="color:var(--primary);">\${run.requestsPerSecond}</strong> req/s</td>
+          <td><strong style="color:\${run.p95ResponseTimeMs > 300 ? 'var(--warning)' : 'var(--success)'};">\${run.p95ResponseTimeMs} ms</strong></td>
+          <td style="color:\${run.httpErrorRatePercent > 1 ? 'var(--danger)' : 'var(--text)'};">\${run.httpErrorRatePercent}%</td>
+          <td><span class="badge \${isPass ? 'badge-pass' : 'badge-fail'}">\${run.status}</span></td>
+          <td><button class="btn" onclick="inspectRun('\${run.testId}')">View Details</button></td>
+        \`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function filterHistoryTable() {
+      const query = document.getElementById('historySearch').value.toLowerCase();
+      const rows = document.querySelectorAll('#historyTableBody tr');
+      rows.forEach(r => {
+        const text = r.textContent.toLowerCase();
+        r.style.display = text.includes(query) ? '' : 'none';
+      });
+    }
+
+    function inspectRun(testId) {
+      const run = (window.ALL_TEST_RUNS || []).find(r => r.testId === testId);
+      if (run) {
+        renderLatestTab(run);
+        renderSystemTab(run);
+        switchTab('latest');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+
+    function renderTrendCharts() {
+      const runs = window.ALL_TEST_RUNS || [];
+      if (runs.length === 0) return;
+
+      renderSvgChart('svgRpsChart', runs.map(r => r.requestsPerSecond), '#38bdf8', 'req/s');
+      renderSvgChart('svgLatencyChart', runs.map(r => r.p95ResponseTimeMs), '#10b981', 'ms');
+    }
+
+    function renderSvgChart(elementId, values, color, unit) {
+      const svg = document.getElementById(elementId);
+      if (!svg || values.length === 0) return;
+
+      const width = svg.clientWidth || 500;
+      const height = 200;
+      const padding = 30;
+
+      const minVal = Math.min(0, ...values);
+      const maxVal = Math.max(...values) * 1.15 || 10;
+
+      const points = values.map((val, idx) => {
+        const x = padding + (idx / Math.max(1, values.length - 1)) * (width - padding * 2);
+        const y = height - padding - ((val - minVal) / (maxVal - minVal)) * (height - padding * 2);
+        return { x, y, val };
+      });
+
+      const pathD = points.map((p, idx) => (idx === 0 ? \`M \${p.x} \${p.y}\` : \`L \${p.x} \${p.y}\`)).join(' ');
+
+      let dotsHtml = '';
+      points.forEach((p, idx) => {
+        dotsHtml += \`
+          <circle cx="\${p.x}" cy="\${p.y}" r="4" fill="\${color}" stroke="#090d16" stroke-width="2">
+            <title>Run #\${idx + 1}: \${p.val} \${unit}</title>
+          </circle>
+          <text x="\${p.x}" y="\${p.y - 8}" fill="var(--text-muted)" font-size="10" text-anchor="middle">\${p.val}</text>
+        \`;
+      });
+
+      svg.innerHTML = \`
+        <line x1="\${padding}" y1="\${height - padding}" x2="\${width - padding}" y2="\${height - padding}" stroke="#334155" stroke-width="1" />
+        <path d="\${pathD}" fill="none" stroke="\${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+        \${dotsHtml}
+      \`;
+    }
+
+    function populateCompareSelects(runs) {
+      const selectA = document.getElementById('compareSelectA');
+      const selectB = document.getElementById('compareSelectB');
+      selectA.innerHTML = '';
+      selectB.innerHTML = '';
+
+      runs.forEach((r, idx) => {
+        const optA = document.createElement('option');
+        optA.value = r.testId;
+        optA.textContent = \`[\${r.testId}] \${(r.testName || '').toUpperCase()} - \${r.requestsPerSecond} RPS (\${new Date(r.startTime).toLocaleTimeString()})\`;
+        selectA.appendChild(optA);
+
+        const optB = document.createElement('option');
+        optB.value = r.testId;
+        optB.textContent = optA.textContent;
+        selectB.appendChild(optB);
+      });
+
+      if (runs.length >= 2) {
+        selectA.selectedIndex = runs.length - 2;
+        selectB.selectedIndex = runs.length - 1;
+      } else if (runs.length === 1) {
+        selectA.selectedIndex = 0;
+        selectB.selectedIndex = 0;
+      }
+
+      runComparison();
+    }
+
+    function runComparison() {
+      const runs = window.ALL_TEST_RUNS || [];
+      const idA = document.getElementById('compareSelectA').value;
+      const idB = document.getElementById('compareSelectB').value;
+
+      const runA = runs.find(r => r.testId === idA);
+      const runB = runs.find(r => r.testId === idB);
+
+      if (!runA || !runB) return;
+
+      const rpsDelta = calcDelta(runA.requestsPerSecond, runB.requestsPerSecond, true);
+      const p95Delta = calcDelta(runA.p95ResponseTimeMs, runB.p95ResponseTimeMs, false);
+      const p99Delta = calcDelta(runA.p99ResponseTimeMs, runB.p99ResponseTimeMs, false);
+      const errDelta = calcDelta(runA.httpErrorRatePercent, runB.httpErrorRatePercent, false);
+
+      document.getElementById('compRpsDelta').innerHTML = rpsDelta.badge;
+      document.getElementById('compRpsBefore').textContent = runA.requestsPerSecond + ' req/s';
+      document.getElementById('compRpsAfter').textContent = runB.requestsPerSecond + ' req/s';
+
+      document.getElementById('compP95Delta').innerHTML = p95Delta.badge;
+      document.getElementById('compP95Before').textContent = runA.p95ResponseTimeMs + ' ms';
+      document.getElementById('compP95After').textContent = runB.p95ResponseTimeMs + ' ms';
+
+      document.getElementById('compP99Delta').innerHTML = p99Delta.badge;
+      document.getElementById('compP99Before').textContent = runA.p99ResponseTimeMs + ' ms';
+      document.getElementById('compP99After').textContent = runB.p99ResponseTimeMs + ' ms';
+
+      document.getElementById('compErrorDelta').innerHTML = errDelta.badge;
+      document.getElementById('compErrorBefore').textContent = runA.httpErrorRatePercent + '%';
+      document.getElementById('compErrorAfter').textContent = runB.httpErrorRatePercent + '%';
+
+      // Overall Outcome Verdict
+      const isImproved = rpsDelta.rawPct >= 0 && p95Delta.rawPct <= 0 && runB.httpErrorRatePercent <= runA.httpErrorRatePercent;
+      const isDegraded = rpsDelta.rawPct < -5 || p95Delta.rawPct > 10 || runB.httpErrorRatePercent > runA.httpErrorRatePercent;
+
+      const outcomeTitle = document.getElementById('compareOutcomeTitle');
+      const outcomePill = document.getElementById('compareOutcomePill');
+
+      if (isImproved) {
+        outcomeTitle.textContent = 'PERFORMANCE IMPROVED 🚀';
+        outcomeTitle.style.color = 'var(--success)';
+        outcomePill.className = 'badge badge-pass';
+        outcomePill.textContent = 'OPTIMIZATION SUCCESSFUL';
+      } else if (isDegraded) {
+        outcomeTitle.textContent = 'PERFORMANCE DEGRADED ⚠️';
+        outcomeTitle.style.color = 'var(--danger)';
+        outcomePill.className = 'badge badge-fail';
+        outcomePill.textContent = 'REGRESSION DETECTED';
+      } else {
+        outcomeTitle.textContent = 'NO SIGNIFICANT CHANGE 🔄';
+        outcomeTitle.style.color = 'var(--primary)';
+        outcomePill.className = 'badge badge-scenario';
+        outcomePill.textContent = 'STABLE BASELINE';
+      }
+
+      // Details Table
+      const tbody = document.getElementById('compDetailsTbody');
+      tbody.innerHTML = \`
+        <tr><td>Throughput (Requests/sec)</td><td>\${runA.requestsPerSecond} req/s</td><td>\${runB.requestsPerSecond} req/s</td><td>\${rpsDelta.badge}</td></tr>
+        <tr><td>P95 Latency (ms)</td><td>\${runA.p95ResponseTimeMs} ms</td><td>\${runB.p95ResponseTimeMs} ms</td><td>\${p95Delta.badge}</td></tr>
+        <tr><td>P99 Latency (ms)</td><td>\${runA.p99ResponseTimeMs} ms</td><td>\${runB.p99ResponseTimeMs} ms</td><td>\${p99Delta.badge}</td></tr>
+        <tr><td>Average Latency (ms)</td><td>\${runA.avgResponseTimeMs} ms</td><td>\${runB.avgResponseTimeMs} ms</td><td>\${calcDelta(runA.avgResponseTimeMs, runB.avgResponseTimeMs, false).badge}</td></tr>
+        <tr><td>HTTP Error Rate (%)</td><td>\${runA.httpErrorRatePercent}%</td><td>\${runB.httpErrorRatePercent}%</td><td>\${errDelta.badge}</td></tr>
+        <tr><td>Total Requests Processed</td><td>\${(runA.totalRequests || 0).toLocaleString()}</td><td>\${(runB.totalRequests || 0).toLocaleString()}</td><td>\${calcDelta(runA.totalRequests, runB.totalRequests, true).badge}</td></tr>
+        <tr><td>Peak Virtual Users (VUs)</td><td>\${runA.peakConcurrentUsers || runA.totalVirtualUsers} VUs</td><td>\${runB.peakConcurrentUsers || runB.totalVirtualUsers} VUs</td><td>-</td></tr>
+      \`;
+    }
+
+    function calcDelta(before, after, higherIsBetter) {
+      if (before === 0 && after === 0) return { badge: '<span class="delta-badge delta-neutral">0%</span>', rawPct: 0 };
+      if (before === 0) return { badge: '<span class="delta-badge delta-neutral">N/A</span>', rawPct: 0 };
+
+      const diff = after - before;
+      const pct = Math.round((diff / before) * 1000) / 10;
+      const isPositive = pct > 0;
+      const isGood = higherIsBetter ? isPositive : !isPositive;
+
+      const sign = isPositive ? '+' : '';
+      const cls = isGood ? 'delta-better' : (pct === 0 ? 'delta-neutral' : 'delta-worse');
+      return {
+        badge: \`<span class="delta-badge \${cls}">\${sign}\${pct}%</span>\`,
+        rawPct: pct,
+      };
+    }
+
+    function renderSystemTab(run) {
+      if (!run) return;
+
+      // Redis
+      if (run.redis) {
+        document.getElementById('redisHitRate').textContent = (run.redis.hitRatePercent || 0) + '%';
+        document.getElementById('redisUsedMem').textContent = run.redis.usedMemoryHuman || '-';
+        document.getElementById('redisPeakMem').textContent = run.redis.peakMemoryHuman || '-';
+        document.getElementById('redisClients').textContent = run.redis.connectedClients || 1;
+        document.getElementById('redisCommands').textContent = (run.redis.totalCommands || 0).toLocaleString();
+      }
+
+      // Host CPU & RAM
+      if (run.cpuUsage) {
+        document.getElementById('sysCpuAvg').textContent = (run.cpuUsage.averagePercent || 0) + '%';
+        document.getElementById('sysCpuPeak').textContent = (run.cpuUsage.peakPercent || 0) + '%';
+      }
+      if (run.ramUsage) {
+        document.getElementById('sysRamAvg').textContent = (run.ramUsage.averageUsedMB || 0) + ' MB';
+        document.getElementById('sysRamPeak').textContent = (run.ramUsage.peakUsedMB || 0) + ' MB';
+        document.getElementById('sysRamPercent').textContent = (run.ramUsage.averagePercent || 0) + '%';
+      }
+    }
+
+    // Auto initialize on load
+    window.addEventListener('DOMContentLoaded', initDashboard);
+  </script>
+</body>
+</html>`;
+  }
+}

@@ -1,0 +1,492 @@
+{
+  "samplesCount": 16,
+  "cpu": {
+    "avgPercent": 11,
+    "peakPercent": 11
+  },
+  "ram": {
+    "avgUsedMB": 11825,
+    "peakUsedMB": 11860,
+    "avgPercent": 75,
+    "peakPercent": 75
+  },
+  "redis": {
+    "connectedClients": 1,
+    "usedMemoryHuman": "1.56M",
+    "peakMemoryHuman": "1.61M",
+    "usedMemoryBytes": 1638568,
+    "totalCommandsProcessed": 604598,
+    "keyspaceHits": 373923,
+    "keyspaceMisses": 229335,
+    "hitRatePercent": 62,
+    "evictedKeys": 0,
+    "rejectedConnections": 0,
+    "uptimeSeconds": 3343
+  },
+  "samples": [
+    {
+      "timestamp": "2026-11-17T17:19:33.956Z",
+      "host": {
+        "platform": "win32",
+        "cpus": 12,
+        "cpuUsagePercent": 11,
+        "totalRamMB": 15739,
+        "usedRamMB": 11784,
+        "ramUsagePercent": 75
+      },
+      "process": {
+        "rssMB": 71,
+        "heapUsedMB": 16,
+        "heapTotalMB": 29
+      },
+      "redis": {
+        "connectedClients": 2,
+        "usedMemoryHuman": "1.58M",
+        "peakMemoryHuman": "1.61M",
+        "usedMemoryBytes": 1655088,
+        "totalCommandsProcessed": 603956,
+        "keyspaceHits": 373557,
+        "keyspaceMisses": 229081,
+        "hitRatePercent": 62,
+        "evictedKeys": 0,
+        "rejectedConnections": 0,
+        "uptimeSeconds": 3327
+      }
+    },
+    {
+      "timestamp": "2026-11-17T17:19:34.969Z",
+      "host": {
+        "platform": "win32",
+        "cpus": 12,
+        "cpuUsagePercent": 11,
+        "totalRamMB": 15739,
+        "usedRamMB": 11824,
+        "ramUsagePercent": 75
+      },
+      "process": {
+        "rssMB": 71,
+        "heapUsedMB": 16,
+        "heapTotalMB": 29
+      },
+      "redis": {
+        "connectedClients": 2,
+        "usedMemoryHuman": "1.57M",
+        "peakMemoryHuman": "1.61M",
+        "usedMemoryBytes": 1641368,
+        "totalCommandsProcessed": 604003,
+        "keyspaceHits": 373575,
+        "keyspaceMisses": 229103,
+        "hitRatePercent": 62,
+        "evictedKeys": 0,
+        "rejectedConnections": 0,
+        "uptimeSeconds": 3328
+      }
+    },
+    {
+      "timestamp": "2026-11-17T17:19:35.980Z",
+      "host": {
+        "platform": "win32",
+        "cpus": 12,
+        "cpuUsagePercent": 11,
+        "totalRamMB": 15739,
+        "usedRamMB": 11827,
+        "ramUsagePercent": 75
+      },
+      "process": {
+        "rssMB": 71,
+        "heapUsedMB": 16,
+        "heapTotalMB": 29
+      },
+      "redis": {
+        "connectedClients": 2,
+        "usedMemoryHuman": "1.57M",
+        "peakMemoryHuman": "1.61M",
+        "usedMemoryBytes": 1642392,
+        "totalCommandsProcessed": 604034,
+        "keyspaceHits": 373593,
+        "keyspaceMisses": 229115,
+        "hitRatePercent": 62,
+        "evictedKeys": 0,
+        "rejectedConnections": 0,
+        "uptimeSeconds": 3329
+      }
+    },
+    {
+      "timestamp": "2026-11-17T17:19:36.980Z",
+      "host": {
+        "platform": "win32",
+        "cpus": 12,
+        "cpuUsagePercent": 11,
+        "totalRamMB": 15739,
+        "usedRamMB": 11826,
+        "ramUsagePercent": 75
+      },
+      "process": {
+        "rssMB": 71,
+        "heapUsedMB": 17,
+        "heapTotalMB": 29
+      },
+      "redis": {
+        "connectedClients": 2,
+        "usedMemoryHuman": "1.57M",
+        "peakMemoryHuman": "1.61M",
+        "usedMemoryBytes": 1644440,
+        "totalCommandsProcessed": 604075,
+        "keyspaceHits": 373617,
+        "keyspaceMisses": 229131,
+        "hitRatePercent": 62,
+        "evictedKeys": 0,
+        "rejectedConnections": 0,
+        "uptimeSeconds": 3330
+      }
+    },
+    {
+      "timestamp": "2026-11-17T17:19:37.980Z",
+      "host": {
+        "platform": "win32",
+        "cpus": 12,
+        "cpuUsagePercent": 11,
+        "totalRamMB": 15739,
+        "usedRamMB": 11828,
+        "ramUsagePercent": 75
+      },
+      "process": {
+        "rssMB": 71,
+        "heapUsedMB": 17,
+        "heapTotalMB": 29
+      },
+      "redis": {
+        "connectedClients": 2,
+        "usedMemoryHuman": "1.57M",
+        "peakMemoryHuman": "1.61M",
+        "usedMemoryBytes": 1648536,
+        "totalCommandsProcessed": 604116,
+        "keyspaceHits": 373641,
+        "keyspaceMisses": 229147,
+        "hitRatePercent": 62,
+        "evictedKeys": 0,
+        "rejectedConnections": 0,
+        "uptimeSeconds": 3331
+      }
+    },
+    {
+      "timestamp": "2026-11-17T17:19:38.990Z",
+      "host": {
+        "platform": "win32",
+        "cpus": 12,
+        "cpuUsagePercent": 11,
+        "totalRamMB": 15739,
+        "usedRamMB": 11831,
+        "ramUsagePercent": 75
+      },
+      "process": {
+        "rssMB": 71,
+        "heapUsedMB": 17,
+        "heapTotalMB": 29
+      },
+      "redis": {
+        "connectedClients": 2,
+        "usedMemoryHuman": "1.57M",
+        "peakMemoryHuman": "1.61M",
+        "usedMemoryBytes": 1648536,
+        "totalCommandsProcessed": 604157,
+        "keyspaceHits": 373665,
+        "keyspaceMisses": 229163,
+        "hitRatePercent": 62,
+        "evictedKeys": 0,
+        "rejectedConnections": 0,
+        "uptimeSeconds": 3332
+      }
+    },
+    {
+      "timestamp": "2026-11-17T17:19:40.004Z",
+      "host": {
+        "platform": "win32",
+        "cpus": 12,
+        "cpuUsagePercent": 11,
+        "totalRamMB": 15739,
+        "usedRamMB": 11808,
+        "ramUsagePercent": 75
+      },
+      "process": {
+        "rssMB": 71,
+        "heapUsedMB": 17,
+        "heapTotalMB": 29
+      },
+      "redis": {
+        "connectedClients": 2,
+        "usedMemoryHuman": "1.57M",
+        "peakMemoryHuman": "1.61M",
+        "usedMemoryBytes": 1641368,
+        "totalCommandsProcessed": 604198,
+        "keyspaceHits": 373689,
+        "keyspaceMisses": 229179,
+        "hitRatePercent": 62,
+        "evictedKeys": 0,
+        "rejectedConnections": 0,
+        "uptimeSeconds": 3334
+      }
+    },
+    {
+      "timestamp": "2026-11-17T17:19:41.016Z",
+      "host": {
+        "platform": "win32",
+        "cpus": 12,
+        "cpuUsagePercent": 11,
+        "totalRamMB": 15739,
+        "usedRamMB": 11768,
+        "ramUsagePercent": 75
+      },
+      "process": {
+        "rssMB": 71,
+        "heapUsedMB": 17,
+        "heapTotalMB": 29
+      },
+      "redis": {
+        "connectedClients": 2,
+        "usedMemoryHuman": "1.57M",
+        "peakMemoryHuman": "1.61M",
+        "usedMemoryBytes": 1642392,
+        "totalCommandsProcessed": 604239,
+        "keyspaceHits": 373713,
+        "keyspaceMisses": 229195,
+        "hitRatePercent": 62,
+        "evictedKeys": 0,
+        "rejectedConnections": 0,
+        "uptimeSeconds": 3335
+      }
+    },
+    {
+      "timestamp": "2026-11-17T17:19:42.016Z",
+      "host": {
+        "platform": "win32",
+        "cpus": 12,
+        "cpuUsagePercent": 11,
+        "totalRamMB": 15739,
+        "usedRamMB": 11824,
+        "ramUsagePercent": 75
+      },
+      "process": {
+        "rssMB": 72,
+        "heapUsedMB": 17,
+        "heapTotalMB": 29
+      },
+      "redis": {
+        "connectedClients": 2,
+        "usedMemoryHuman": "1.57M",
+        "peakMemoryHuman": "1.61M",
+        "usedMemoryBytes": 1644440,
+        "totalCommandsProcessed": 604290,
+        "keyspaceHits": 373743,
+        "keyspaceMisses": 229215,
+        "hitRatePercent": 62,
+        "evictedKeys": 0,
+        "rejectedConnections": 0,
+        "uptimeSeconds": 3336
+      }
+    },
+    {
+      "timestamp": "2026-11-17T17:19:43.031Z",
+      "host": {
+        "platform": "win32",
+        "cpus": 12,
+        "cpuUsagePercent": 11,
+        "totalRamMB": 15739,
+        "usedRamMB": 11835,
+        "ramUsagePercent": 75
+      },
+      "process": {
+        "rssMB": 60,
+        "heapUsedMB": 9,
+        "heapTotalMB": 11
+      },
+      "redis": {
+        "connectedClients": 2,
+        "usedMemoryHuman": "1.57M",
+        "peakMemoryHuman": "1.61M",
+        "usedMemoryBytes": 1648536,
+        "totalCommandsProcessed": 604331,
+        "keyspaceHits": 373767,
+        "keyspaceMisses": 229231,
+        "hitRatePercent": 62,
+        "evictedKeys": 0,
+        "rejectedConnections": 0,
+        "uptimeSeconds": 3337
+      }
+    },
+    {
+      "timestamp": "2026-11-17T17:19:44.043Z",
+      "host": {
+        "platform": "win32",
+        "cpus": 12,
+        "cpuUsagePercent": 11,
+        "totalRamMB": 15739,
+        "usedRamMB": 11825,
+        "ramUsagePercent": 75
+      },
+      "process": {
+        "rssMB": 60,
+        "heapUsedMB": 9,
+        "heapTotalMB": 11
+      },
+      "redis": {
+        "connectedClients": 2,
+        "usedMemoryHuman": "1.57M",
+        "peakMemoryHuman": "1.61M",
+        "usedMemoryBytes": 1648536,
+        "totalCommandsProcessed": 604372,
+        "keyspaceHits": 373791,
+        "keyspaceMisses": 229247,
+        "hitRatePercent": 62,
+        "evictedKeys": 0,
+        "rejectedConnections": 0,
+        "uptimeSeconds": 3338
+      }
+    },
+    {
+      "timestamp": "2026-11-17T17:19:45.057Z",
+      "host": {
+        "platform": "win32",
+        "cpus": 12,
+        "cpuUsagePercent": 11,
+        "totalRamMB": 15739,
+        "usedRamMB": 11826,
+        "ramUsagePercent": 75
+      },
+      "process": {
+        "rssMB": 60,
+        "heapUsedMB": 9,
+        "heapTotalMB": 11
+      },
+      "redis": {
+        "connectedClients": 2,
+        "usedMemoryHuman": "1.57M",
+        "peakMemoryHuman": "1.61M",
+        "usedMemoryBytes": 1641368,
+        "totalCommandsProcessed": 604423,
+        "keyspaceHits": 373821,
+        "keyspaceMisses": 229267,
+        "hitRatePercent": 62,
+        "evictedKeys": 0,
+        "rejectedConnections": 0,
+        "uptimeSeconds": 3339
+      }
+    },
+    {
+      "timestamp": "2026-11-17T17:19:46.071Z",
+      "host": {
+        "platform": "win32",
+        "cpus": 12,
+        "cpuUsagePercent": 11,
+        "totalRamMB": 15739,
+        "usedRamMB": 11823,
+        "ramUsagePercent": 75
+      },
+      "process": {
+        "rssMB": 60,
+        "heapUsedMB": 10,
+        "heapTotalMB": 11
+      },
+      "redis": {
+        "connectedClients": 2,
+        "usedMemoryHuman": "1.57M",
+        "peakMemoryHuman": "1.61M",
+        "usedMemoryBytes": 1642392,
+        "totalCommandsProcessed": 604484,
+        "keyspaceHits": 373857,
+        "keyspaceMisses": 229291,
+        "hitRatePercent": 62,
+        "evictedKeys": 0,
+        "rejectedConnections": 0,
+        "uptimeSeconds": 3340
+      }
+    },
+    {
+      "timestamp": "2026-11-17T17:19:47.081Z",
+      "host": {
+        "platform": "win32",
+        "cpus": 12,
+        "cpuUsagePercent": 11,
+        "totalRamMB": 15739,
+        "usedRamMB": 11848,
+        "ramUsagePercent": 75
+      },
+      "process": {
+        "rssMB": 60,
+        "heapUsedMB": 10,
+        "heapTotalMB": 11
+      },
+      "redis": {
+        "connectedClients": 2,
+        "usedMemoryHuman": "1.57M",
+        "peakMemoryHuman": "1.61M",
+        "usedMemoryBytes": 1644440,
+        "totalCommandsProcessed": 604513,
+        "keyspaceHits": 373874,
+        "keyspaceMisses": 229302,
+        "hitRatePercent": 62,
+        "evictedKeys": 0,
+        "rejectedConnections": 0,
+        "uptimeSeconds": 3341
+      }
+    },
+    {
+      "timestamp": "2026-11-17T17:19:48.081Z",
+      "host": {
+        "platform": "win32",
+        "cpus": 12,
+        "cpuUsagePercent": 11,
+        "totalRamMB": 15739,
+        "usedRamMB": 11860,
+        "ramUsagePercent": 75
+      },
+      "process": {
+        "rssMB": 61,
+        "heapUsedMB": 10,
+        "heapTotalMB": 11
+      },
+      "redis": {
+        "connectedClients": 2,
+        "usedMemoryHuman": "1.57M",
+        "peakMemoryHuman": "1.61M",
+        "usedMemoryBytes": 1648536,
+        "totalCommandsProcessed": 604556,
+        "keyspaceHits": 373899,
+        "keyspaceMisses": 229319,
+        "hitRatePercent": 62,
+        "evictedKeys": 0,
+        "rejectedConnections": 0,
+        "uptimeSeconds": 3342
+      }
+    },
+    {
+      "timestamp": "2026-11-17T17:19:49.094Z",
+      "host": {
+        "platform": "win32",
+        "cpus": 12,
+        "cpuUsagePercent": 11,
+        "totalRamMB": 15739,
+        "usedRamMB": 11858,
+        "ramUsagePercent": 75
+      },
+      "process": {
+        "rssMB": 61,
+        "heapUsedMB": 10,
+        "heapTotalMB": 11
+      },
+      "redis": {
+        "connectedClients": 2,
+        "usedMemoryHuman": "1.57M",
+        "peakMemoryHuman": "1.61M",
+        "usedMemoryBytes": 1648536,
+        "totalCommandsProcessed": 604597,
+        "keyspaceHits": 373923,
+        "keyspaceMisses": 229335,
+        "hitRatePercent": 62,
+        "evictedKeys": 0,
+        "rejectedConnections": 0,
+        "uptimeSeconds": 3343
+      }
+    }
+  ]
+}

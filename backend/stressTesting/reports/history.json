@@ -1,0 +1,48 @@
+[
+  {
+    "testId": "stress-smoke-2026-11-17-171933",
+    "testName": "smoke",
+    "status": "PASSED",
+    "startTime": "2026-11-17T17:19:33.959Z",
+    "endTime": "2026-11-17T17:19:49.929Z",
+    "durationSeconds": 16,
+    "gitCommit": "e2cd31a",
+    "appVersion": "1.0.0",
+    "environment": "development",
+    "targetUrl": "http://localhost:8000/api/v1",
+    "totalVirtualUsers": 2,
+    "peakConcurrentUsers": 2,
+    "totalRequests": 312,
+    "successfulRequests": 312,
+    "failedRequests": 0,
+    "requestsPerSecond": 20.17,
+    "avgResponseTimeMs": 2.69,
+    "medianResponseTimeMs": 2.11,
+    "p90ResponseTimeMs": 3.49,
+    "p95ResponseTimeMs": 4.51,
+    "p99ResponseTimeMs": 0,
+    "maxResponseTimeMs": 96.95,
+    "cacheHitP95Ms": 4.74,
+    "httpErrorRatePercent": 0,
+    "checkSuccessRatePercent": 100,
+    "dataReceivedMB": 0.39,
+    "dataSentMB": 0.21,
+    "cpuUsage": {
+      "averagePercent": 11,
+      "peakPercent": 11
+    },
+    "ramUsage": {
+      "averageUsedMB": 11825,
+      "peakUsedMB": 11860,
+      "averagePercent": 75
+    },
+    "redis": {
+      "connectedClients": 1,
+      "usedMemoryHuman": "1.56M",
+      "peakMemoryHuman": "1.61M",
+      "hitRatePercent": 62,
+      "totalCommands": 604598
+    },
+    "capacity": null
+  }
+]
